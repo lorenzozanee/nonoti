@@ -1,0 +1,54 @@
+# Android and Gradle
+.gradle/
+.kotlin/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Android Studio and IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Signing, credentials, and local configuration
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+google-services.json
+service-account*.json
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Logs, caches, and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.cache/
+
+# Local agent state
+.agents/
+.serena/
+.claude/settings.local.json
+.codex/*.local.*
