@@ -222,12 +222,11 @@ object NonotiPlatform {
     }
 
     @Synchronized
-    fun finish(context: Context, sessionId: String, releaseTimedOut: Boolean = false) {
+    fun finish(context: Context, sessionId: String) {
         val app = context.applicationContext as NonotiApplication
         val persisted = runBlocking { app.database.dao().focusSession() }
         if (!FocusSessionIdentity.isCurrent(sessionId, persisted?.id, FocusRuntime.current()?.id)) return
         val persistedEnd = persisted?.endMillis ?: 0L
-        val pendingSnoozed = FocusRuntime.pendingSnoozedCount(sessionId)
         val count = maxOf(FocusRuntime.store().distinctCount(sessionId), app.database.dao().notificationCountBlocking(sessionId))
         val platform = AndroidFocusPlatform(context.applicationContext)
         val summaryReady = platform.canPostSummary()
@@ -269,33 +268,9 @@ object NonotiPlatform {
                 app.database.dao().upsertFocusSession(persisted.copy(summarySent = true))
             }
         }
-        if (releaseTimedOut) {
-            CompatibilityStore(context).invalidate()
-            if (persisted?.id == sessionId) {
-                runBlocking {
-                    app.database.dao().upsertFocusSession(
-                        persisted.copy(
-                            state = FocusState.Unsupported,
-                            failureReason = "notifications did not restore before release timeout",
-                            summarySent = true,
-                        ),
-                    )
-                }
-            }
-            if (sessionId.startsWith("compatibility-")) CompatibilityStore(context).cancelTest()
-            coordinator = null
-            FocusRuntime.showUnsupported(
-                sessionId,
-                persisted?.endMillis ?: System.currentTimeMillis(),
-                "notifications did not restore before release timeout",
-            )
-            FocusForegroundService.stop(context)
-            AndroidFocusSchedule(context).reconcile()
-            return
-        }
         runBlocking { app.database.dao().clearFocusSession() }
         if (sessionId.startsWith("compatibility-")) {
-            if (summaryReady && pendingSnoozed == 0 && count > 0 && System.currentTimeMillis() >= persistedEnd) CompatibilityStore(context).markTestCompleted()
+            if (summaryReady && count > 0 && System.currentTimeMillis() >= persistedEnd) CompatibilityStore(context).markTestCompleted()
             else CompatibilityStore(context).cancelTest()
         }
         coordinator = null
@@ -312,25 +287,10 @@ object NonotiPlatform {
         FocusRuntime.beginRelease(sessionId)
         val app = context.applicationContext as NonotiApplication
         val persisted = runBlocking { app.database.dao().focusSession() }
-        val end = persisted?.endMillis ?: 0L
         if (persisted?.id == sessionId) {
             runBlocking { app.database.dao().upsertFocusSession(persisted.copy(state = FocusState.Releasing)) }
         }
-        val timeout = NotificationSnoozePolicy.releaseDelayMillis(end - System.currentTimeMillis())
-        try {
-            val startedAt = System.currentTimeMillis()
-            val deadline = startedAt + timeout
-            while (System.currentTimeMillis() < deadline &&
-                (System.currentTimeMillis() - startedAt < 5_000L || FocusRuntime.pendingSnoozedCount(sessionId) > 0)
-            ) {
-                Thread.sleep(250L)
-            }
-            val releaseTimedOut = FocusRuntime.pendingSnoozedCount(sessionId) > 0
-            finish(context, sessionId, releaseTimedOut)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            failOpen(context, sessionId)
-        }
+        finish(context, sessionId)
     }
 
     @Synchronized

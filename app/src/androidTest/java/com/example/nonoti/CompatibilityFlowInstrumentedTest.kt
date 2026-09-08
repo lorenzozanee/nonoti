@@ -94,6 +94,7 @@ class CompatibilityFlowInstrumentedTest {
     @Test
     fun controlledNotificationIsCapturedAndReleasedWithOneSummary() {
         val platform = AndroidFocusPlatform(context)
+        val manager = context.getSystemService(NotificationManager::class.java)
         eventually(10_000) { platform.readiness().notificationAccess }
         val readiness = platform.readiness().copy(compatibility = true)
         assertTrue("Missing requirements: ${readiness.missingRequirements}", readiness.isReady)
@@ -103,10 +104,12 @@ class CompatibilityFlowInstrumentedTest {
             CompatibilityTestController.start(context),
         )
         eventually(5_000) { FocusRuntime.current() != null && platform.isZenActive() }
+        eventually(5_000) { manager.activeNotifications.any { it.id == CompatibilityTestController.NotificationId } }
         eventually(45_000) { CompatibilityStore(context).isTestCompleted() && FocusRuntime.current() == null }
 
         val captured = runBlocking { application.boxRepository.notifications.first() }
-        assertEquals(listOf("nonoti compatibility test"), captured.map { it.title })
+        assertTrue(captured.any { it.title == context.getString(R.string.compatibility_notification_title) })
+        assertTrue(manager.activeNotifications.any { it.id == CompatibilityTestController.NotificationId })
         assertFalse(platform.isZenActive())
         val summaries = context.getSystemService(NotificationManager::class.java).activeNotifications
             .count {
@@ -180,28 +183,6 @@ class CompatibilityFlowInstrumentedTest {
 
         eventually(5_000) { !platform.isZenActive() }
         assertNull(runBlocking { application.database.dao().focusSession() })
-    }
-
-    @Test
-    fun releaseTimeoutClosesZenButPersistsUnsupportedSession() {
-        val platform = AndroidFocusPlatform(context)
-        eventually(10_000) { platform.readiness().notificationAccess }
-        CompatibilityStore(context).apply {
-            beginTest()
-            markTestCompleted()
-            markPassed()
-        }
-        val now = Instant.now()
-        val session = FocusSession("release-timeout", now, now.plusSeconds(600))
-        assertEquals(FocusStartResult.Started, NonotiPlatform.start(context, session, platform.readiness()))
-        FocusRuntime.markSnoozed(session.id, "never-restored")
-
-        NonotiPlatform.finish(context, session.id, releaseTimedOut = true)
-
-        val persisted = runBlocking { application.database.dao().focusSession() }
-        assertEquals(FocusState.Unsupported, persisted?.state)
-        assertFalse(platform.isZenActive())
-        assertTrue(FocusRuntime.current()?.isUnsupported == true)
     }
 
     @Test

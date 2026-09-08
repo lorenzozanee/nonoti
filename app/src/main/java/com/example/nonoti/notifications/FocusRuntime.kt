@@ -22,7 +22,6 @@ object FocusRuntime {
     private val activeState = MutableStateFlow<ActiveFocusSession?>(null)
     private val store = InMemoryNotificationBoxStore()
     private val contentIntents = java.util.concurrent.ConcurrentHashMap<String, PendingIntent>()
-    private val snoozedKeys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     fun start(session: ActiveFocusSession) {
         activeSession.set(session)
@@ -30,7 +29,6 @@ object FocusRuntime {
     }
 
     fun stop() {
-        activeSession.get()?.id?.let(::clearSnoozed)
         activeSession.set(null)
         activeState.value = null
     }
@@ -63,17 +61,6 @@ object FocusRuntime {
 
     fun isListenerConnected(): Boolean = listenerConnected.get()
 
-    fun markSnoozed(sessionId: String, key: String) {
-        snoozedKeys += identity(sessionId, key)
-    }
-
-    fun markRestored(sessionId: String, key: String) {
-        snoozedKeys -= identity(sessionId, key)
-    }
-
-    fun pendingSnoozedCount(sessionId: String): Int =
-        snoozedKeys.count { it.startsWith("$sessionId\u0000") }
-
     val state: StateFlow<ActiveFocusSession?> = activeState
 
     fun store(): NotificationBoxStore = store
@@ -92,8 +79,4 @@ object FocusRuntime {
     }
 
     private fun identity(sessionId: String, key: String) = "$sessionId\u0000$key"
-
-    private fun clearSnoozed(sessionId: String) {
-        snoozedKeys.removeIf { it.startsWith("$sessionId\u0000") }
-    }
 }

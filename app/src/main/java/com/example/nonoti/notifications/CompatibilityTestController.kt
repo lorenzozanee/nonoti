@@ -10,6 +10,7 @@ import java.time.Instant
 
 object CompatibilityTestController {
     const val ChannelId = "compatibility-test"
+    const val NotificationId = 43001
     private const val DurationSeconds = 30L
 
     fun start(context: Context): Boolean {
@@ -27,7 +28,7 @@ object CompatibilityTestController {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(ChannelId, context.getString(R.string.compatibility_channel), NotificationManager.IMPORTANCE_HIGH))
         manager.notify(
-            43001,
+            NotificationId,
             NotificationCompat.Builder(context, ChannelId)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle(context.getString(R.string.compatibility_notification_title))

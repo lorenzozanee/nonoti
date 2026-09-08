@@ -35,6 +35,14 @@ class ZenRuleController(private val context: Context) {
                     true,
                 ),
             )
+            existing?.value?.let { rule ->
+                val currentPolicy = rule.zenPolicy
+                rule.zenPolicy = policy(
+                    allowCalls = currentPolicy?.priorityCategoryCalls == ZenPolicy.STATE_ALLOW,
+                    allowAlarms = currentPolicy?.priorityCategoryAlarms == ZenPolicy.STATE_ALLOW,
+                )
+                notificationManager.updateAutomaticZenRule(requireNotNull(ruleId), rule)
+            }
             preferences.edit().putString(RuleIdKey, ruleId).apply()
             ruleId
         }.getOrNull()
@@ -169,7 +177,7 @@ class ZenRuleController(private val context: Context) {
             .disallowAllSounds()
             .allowAlarms(allowAlarms)
             .allowCalls(if (allowCalls) ZenPolicy.PEOPLE_TYPE_ANYONE else ZenPolicy.PEOPLE_TYPE_NONE)
-            .allowSystem(true)
+            .allowSystem(false)
             .hideAllVisualEffects()
         if (Build.VERSION.SDK_INT >= 35) builder.allowPriorityChannels(false)
         return builder.build()

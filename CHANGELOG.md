@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.5 - 2026-09-08
+
+### Fixed
+
+- Prevent repeated Android DND prompts during Focus.
+- Keep captured notifications owned by their source app so they return when Focus ends.
+- Remove the obsolete notification snooze and release-timeout path.
+
+### Validation and limitations
+
+- Unit tests, Android lint, Debug build, and the API 37 Google API emulator Focus flow passed.
+- Physical OEM behavior remains unverified.
+- The Release APK is debug-signed for testing and is not production-signed.
+
 ## 0.1.4 - 2026-09-08
 
 ### Fixed
