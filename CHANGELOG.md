@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.4 - 2026-09-08
+
+### Fixed
+
+- Keep an active Focus session during a transient notification-listener disconnect while Android recreates the app process after its recent-task card is removed.
+- Restore notification capture from the persisted Focus session instead of treating the new process's initial disconnected state as a Focus failure.
+- Determine notification-listener access from the durable Android system grant so Setup no longer reports `Needs access` while access is enabled.
+
+### Validation and limitations
+
+- Unit tests, Android lint, and Debug/Release builds passed.
+- Android force-stop remains outside the guarantee because it disables the app's services, receivers, and alarms.
+- Physical OEM behavior remains unverified.
+- The Release APK is unsigned and must be signed before installation.
+
 ## 0.1.2 - 2026-09-08
 
 ### Changed

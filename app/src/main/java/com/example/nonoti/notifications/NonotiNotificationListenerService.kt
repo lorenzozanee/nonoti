@@ -43,7 +43,14 @@ class NonotiNotificationListenerService : NotificationListenerService() {
             NotificationListenerService.requestRebind(ComponentName(this, NonotiNotificationListenerService::class.java))
             io.execute {
                 Thread.sleep(ListenerReconnectGraceMillis)
-                if (!FocusRuntime.isListenerConnected()) {
+                val accessGranted = androidx.core.app.NotificationManagerCompat
+                    .getEnabledListenerPackages(this)
+                    .contains(packageName)
+                if (ListenerConnectionChange.shouldFailOpen(
+                        listenerConnected = FocusRuntime.isListenerConnected(),
+                        accessGranted = accessGranted,
+                    )
+                ) {
                     CompatibilityStore(this).invalidate()
                     NonotiPlatform.failOpen(applicationContext, session.id)
                 }
@@ -175,6 +182,11 @@ class NonotiNotificationListenerService : NotificationListenerService() {
         const val SnoozeReconciliationGraceMillis = 2_000L
         const val ListenerReconnectGraceMillis = 5_000L
     }
+}
+
+object ListenerConnectionChange {
+    fun shouldFailOpen(listenerConnected: Boolean, accessGranted: Boolean): Boolean =
+        !listenerConnected && !accessGranted
 }
 
 object NotificationSnoozePolicy {

@@ -75,8 +75,8 @@ class AndroidFocusPlatform(private val context: Context) : FocusPlatformPort {
     }
 
     fun readiness(): FocusReadiness {
-        val notificationAccess = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName) &&
-            FocusRuntime.isListenerConnected()
+        val notificationAccess = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context)
+            .contains(context.packageName)
         val policyAccess = notifications?.isNotificationPolicyAccessGranted == true
         val exactAlarms = alarms?.canScheduleExactAlarms() ?: false
         ensureSummaryChannel()
