@@ -24,6 +24,14 @@ class FocusStateReconcilerTest {
     }
 
     @Test
+    fun compatibilitySelfTestIsNotRequiredForFocus() {
+        val readiness = FocusReadiness.allReady().copy(compatibility = false)
+
+        assertEquals(true, readiness.isReady)
+        assertEquals(emptySet<FocusReadinessRequirement>(), readiness.missingRequirements)
+    }
+
+    @Test
     fun missingReadinessIsUnsupportedBeforeStartingFocus() {
         val result = FocusStateReconciler.reconcile(
             FocusReconciliationInput(

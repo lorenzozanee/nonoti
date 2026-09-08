@@ -15,7 +15,6 @@ enum class FocusReadinessRequirement {
     ZenRule,
     ExactAlarms,
     PostNotifications,
-    Compatibility,
 }
 
 data class FocusReadiness(
@@ -33,7 +32,6 @@ data class FocusReadiness(
             if (!zenRule) add(FocusReadinessRequirement.ZenRule)
             if (!exactAlarms) add(FocusReadinessRequirement.ExactAlarms)
             if (!postNotifications) add(FocusReadinessRequirement.PostNotifications)
-            if (!compatibility) add(FocusReadinessRequirement.Compatibility)
         }
 
     val isReady: Boolean

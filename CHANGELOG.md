@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.2 - 2026-09-08
+
+### Changed
+
+- Renamed user-facing branding and Gradle project display name to NoNoTi.
+- Replaced normal and rounded launcher icons with the updated NoNoTi artwork.
+- Request Android-owned permission surfaces on first launch; Setup remains available for permissions that are still missing.
+- Made compatibility self-test optional for starting Focus.
+- Keep an active Focus session in a foreground service so removing the recent-task card does not stop notification capture.
+
+### Validation and limitations
+
+- Unit tests, Android lint, and Debug build passed.
+- API 37 emulator validation confirmed first-run permissions, Focus without compatibility self-test, recent-task removal, notification capture, release summary, and foreground-service shutdown.
+- Android force-stop remains outside the guarantee because it disables the app's services, receivers, and alarms.
+
 ## 0.1.1 - 2026-09-08
 
 ### Changed

@@ -54,7 +54,7 @@ class ZenRuleController(private val context: Context) {
             if (enabled && !rule.isEnabled) return@runCatching false
             notificationManager.setAutomaticZenRuleState(
                 id,
-                Condition(rule.conditionId, "nonoti Focus", if (enabled) Condition.STATE_TRUE else Condition.STATE_FALSE),
+                Condition(rule.conditionId, "NoNoTi Focus", if (enabled) Condition.STATE_TRUE else Condition.STATE_FALSE),
             )
             val confirmed = if (enabled) {
                 awaitActive()
@@ -176,7 +176,7 @@ class ZenRuleController(private val context: Context) {
     }
 
     companion object {
-        const val RuleName = "nonoti Focus"
+        const val RuleName = "NoNoTi Focus"
         val ConditionId: Uri = Uri.parse("nonoti://focus")
         private const val RuleIdKey = "rule_id"
         private const val CommandedActiveKey = "commanded_active"

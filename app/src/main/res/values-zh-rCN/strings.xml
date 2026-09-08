@@ -1,5 +1,8 @@
 <resources>
-    <string name="app_name">nonoti</string>
+    <string name="app_name">NoNoTi</string>
+    <string name="focus_service_channel">专注进行中</string>
+    <string name="focus_service_title">NoNoTi 专注进行中</string>
+    <string name="focus_service_detail">将在专注结束前持续捕获通知</string>
     <string name="notification_listener_description">在专注期间捕获符合条件的通知，并在本地保存文字快照。</string>
     <string name="shortcut_emergency_short">紧急访问</string>
     <string name="shortcut_emergency_long">以紧急访问打开收纳盒</string>
@@ -7,13 +10,13 @@
     <string name="tab_box">收纳盒</string>
     <string name="tab_settings">设置</string>
     <string name="emergency_access">紧急访问</string>
-    <string name="emergency_prompt">专注仍在进行。要继续前往收纳盒吗？nonoti 离开前台后，此访问权限会再次锁定。</string>
+    <string name="emergency_prompt">专注仍在进行。要继续前往收纳盒吗？NoNoTi 离开前台后，此访问权限会再次锁定。</string>
     <string name="continue_action">继续</string>
     <string name="cancel">取消</string>
     <string name="restoring_quietly">正在静默恢复</string>
     <string name="focus_active">专注进行中</string>
     <string name="focus_unavailable">专注不可用</string>
-    <string name="focus_recovery_detail">nonoti 已停止捕获通知。请先重试恢复，然后再开始专注。</string>
+    <string name="focus_recovery_detail">NoNoTi 已停止捕获通知。请先重试恢复，然后再开始专注。</string>
     <string name="retry_recovery">重试恢复</string>
     <string name="ends_at">结束时间：%1$s</string>
     <string name="hold_emergency">长按以紧急访问</string>
@@ -23,7 +26,7 @@
     <string name="end_focus_detail">通知将被释放，并发送专注摘要。</string>
     <string name="end_focus">结束专注</string>
     <string name="focus_intro">选择消息暂缓到来的时间。</string>
-    <string name="setup_title">设置 nonoti</string>
+    <string name="setup_title">设置 NoNoTi</string>
     <string name="setup_detail">授予使用专注所需的权限。你可以暂时跳过，稍后再逐项查看。</string>
     <string name="not_now">暂不</string>
     <string name="today">今天</string>
@@ -34,7 +37,7 @@
     <string name="compatibility_self_test">兼容性自测</string>
     <string name="start_now_detail">选择本次专注结束的时间。</string>
     <string name="daily_block_detail">每日时段精确到分钟。</string>
-    <string name="compatibility_instructions">运行 30 秒专注测试。仅当没有声音、振动、浮窗或状态栏闪烁，原通知静默返回，且只有一条 nonoti 摘要发出提醒时，才予以确认。</string>
+    <string name="compatibility_instructions">运行 30 秒专注测试。仅当没有声音、振动、浮窗或状态栏闪烁，原通知静默返回，且只有一条 NoNoTi 摘要发出提醒时，才予以确认。</string>
     <string name="test_completed">测试完成。请确认你观察到的情况。</string>
     <string name="test_running">测试进行中。请保持屏幕亮起并观察系统通知。</string>
     <string name="run_test">运行 30 秒测试</string>
@@ -47,7 +50,7 @@
     <string name="delete_focus_detail">%1$s 将不再每天重复。</string>
     <string name="delete">删除</string>
     <string name="notification_privacy">通知隐私</string>
-    <string name="notification_privacy_detail">nonoti 可以读取其他应用的通知标题和消息文本。捕获的内容仅保存在本机，不会发送到服务器。</string>
+    <string name="notification_privacy_detail">NoNoTi 可以读取其他应用的通知标题和消息文本。捕获的内容仅保存在本机，不会发送到服务器。</string>
     <string name="continue_settings">继续前往设置</string>
     <string name="upcoming">即将开始</string>
     <string name="focusing">专注中</string>
@@ -80,7 +83,7 @@
     <string name="readiness">准备情况</string>
     <string name="appearance">外观</string>
     <string name="dark_mode">深色模式</string>
-    <string name="dark_mode_detail">使用 nonoti 的深色外观</string>
+    <string name="dark_mode_detail">使用 NoNoTi 的深色外观</string>
     <string name="app_language">语言</string>
     <string name="system_language">跟随系统语言</string>
     <string name="notification_access_detail">捕获消息所需</string>
@@ -108,7 +111,7 @@
     <string name="start_now_too_short">专注至少需要运行 5 分钟。</string>
     <string name="start_now_too_long">专注最长不能超过 24 小时。</string>
     <string name="compatibility_channel">兼容性测试</string>
-    <string name="compatibility_notification_title">nonoti 兼容性测试</string>
+    <string name="compatibility_notification_title">NoNoTi 兼容性测试</string>
     <string name="compatibility_notification_text">此通知应在不发出提醒的情况下被捕获。</string>
     <string name="summary_channel">专注摘要</string>
     <string name="summary_title">专注已结束</string>

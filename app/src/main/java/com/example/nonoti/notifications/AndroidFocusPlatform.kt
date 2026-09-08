@@ -129,7 +129,9 @@ class FocusEndReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_END) return
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return
-        NonotiPlatform.release(context.applicationContext, sessionId)
+        if (!FocusForegroundService.release(context.applicationContext, sessionId)) {
+            NonotiPlatform.release(context.applicationContext, sessionId)
+        }
     }
 
     companion object {
@@ -169,6 +171,10 @@ object NonotiPlatform {
                 return FocusStartResult.Unsupported
             }
             FocusRuntime.start(ActiveFocusSession(effectiveSession.id, effectiveSession.end.toEpochMilli()))
+            if (!FocusForegroundService.start(context)) {
+                failOpen(context, persisted.id)
+                return FocusStartResult.Unsupported
+            }
             runBlocking {
                 app.database.dao().upsertFocusSession(
                     persisted.copy(
@@ -196,6 +202,7 @@ object NonotiPlatform {
             activate = { active.start(effectiveSession, readiness) },
             persistActive = {
                 runCatching {
+                    check(FocusForegroundService.start(context))
                     coordinator = active
                     FocusRuntime.start(ActiveFocusSession(effectiveSession.id, effectiveSession.end.toEpochMilli()))
                     runBlocking { app.database.dao().upsertFocusSession(effectiveSession.toEntity(FocusState.Focusing)) }
@@ -207,6 +214,8 @@ object NonotiPlatform {
                 platform.cancelEnd(effectiveSession.id)
                 coordinator = null
                 FocusRuntime.stop()
+                FocusForegroundService.stop(context)
+                runBlocking { app.database.dao().clearFocusSession() }
             },
         )
         return result
@@ -233,6 +242,7 @@ object NonotiPlatform {
             }
             coordinator = null
             FocusRuntime.showUnsupported(sessionId, persisted?.endMillis ?: System.currentTimeMillis(), "unable to disable focus rule")
+            FocusForegroundService.stop(context)
             return
         }
         platform.cancelEnd(sessionId)
@@ -247,6 +257,7 @@ object NonotiPlatform {
             }
             coordinator = null
             FocusRuntime.showUnsupported(sessionId, persisted?.endMillis ?: System.currentTimeMillis(), "summary notification unavailable")
+            FocusForegroundService.stop(context)
             AndroidFocusSchedule(context).reconcile()
             return
         }
@@ -278,6 +289,7 @@ object NonotiPlatform {
                 persisted?.endMillis ?: System.currentTimeMillis(),
                 "notifications did not restore before release timeout",
             )
+            FocusForegroundService.stop(context)
             AndroidFocusSchedule(context).reconcile()
             return
         }
@@ -288,10 +300,15 @@ object NonotiPlatform {
         }
         coordinator = null
         FocusRuntime.stop()
+        FocusForegroundService.stop(context)
         AndroidFocusSchedule(context).reconcile()
     }
 
     fun release(context: Context, sessionId: String) {
+        Thread { releaseBlocking(context, sessionId) }.start()
+    }
+
+    fun releaseBlocking(context: Context, sessionId: String) {
         FocusRuntime.beginRelease(sessionId)
         val app = context.applicationContext as NonotiApplication
         val persisted = runBlocking { app.database.dao().focusSession() }
@@ -300,22 +317,20 @@ object NonotiPlatform {
             runBlocking { app.database.dao().upsertFocusSession(persisted.copy(state = FocusState.Releasing)) }
         }
         val timeout = NotificationSnoozePolicy.releaseDelayMillis(end - System.currentTimeMillis())
-        Thread {
-            try {
-                val startedAt = System.currentTimeMillis()
-                val deadline = startedAt + timeout
-                while (System.currentTimeMillis() < deadline &&
-                    (System.currentTimeMillis() - startedAt < 5_000L || FocusRuntime.pendingSnoozedCount(sessionId) > 0)
-                ) {
-                    Thread.sleep(250L)
-                }
-                val releaseTimedOut = FocusRuntime.pendingSnoozedCount(sessionId) > 0
-                finish(context, sessionId, releaseTimedOut)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                failOpen(context, sessionId)
+        try {
+            val startedAt = System.currentTimeMillis()
+            val deadline = startedAt + timeout
+            while (System.currentTimeMillis() < deadline &&
+                (System.currentTimeMillis() - startedAt < 5_000L || FocusRuntime.pendingSnoozedCount(sessionId) > 0)
+            ) {
+                Thread.sleep(250L)
             }
-        }.start()
+            val releaseTimedOut = FocusRuntime.pendingSnoozedCount(sessionId) > 0
+            finish(context, sessionId, releaseTimedOut)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            failOpen(context, sessionId)
+        }
     }
 
     @Synchronized
@@ -339,6 +354,7 @@ object NonotiPlatform {
             persisted?.endMillis ?: System.currentTimeMillis(),
             "platform capability lost",
         )
+        FocusForegroundService.stop(context)
         AndroidFocusSchedule(context).reconcile()
     }
 
@@ -360,6 +376,7 @@ object NonotiPlatform {
                     )
                 }
             }
+            FocusForegroundService.stop(context)
             return
         }
         if (persisted.state == FocusState.Unsupported) {
@@ -375,6 +392,7 @@ object NonotiPlatform {
                     persisted.failureReason ?: "recovery required",
                 )
             }
+            FocusForegroundService.stop(context)
             return
         }
         if (persisted.state == FocusState.Releasing) {
@@ -406,6 +424,7 @@ object NonotiPlatform {
                 }
                 FocusRuntime.showUnsupported(id, end, "invalid session could not disable focus rule")
             }
+            FocusForegroundService.stop(context)
             return
         }
         if (end <= System.currentTimeMillis()) {
@@ -425,6 +444,9 @@ object NonotiPlatform {
             return
         }
         FocusRuntime.start(ActiveFocusSession(id, end))
+        if (!FocusForegroundService.start(context)) {
+            failOpen(context, id)
+        }
     }
 
     @Synchronized

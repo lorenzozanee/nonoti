@@ -157,6 +157,44 @@ fun NonotiApp(
     var setupDismissed by remember { mutableStateOf(false) }
     var readinessRefresh by remember { mutableIntStateOf(0) }
     val readiness = rememberReadiness(readinessRefresh)
+    val firstRunPermissionStore = remember { FirstRunPermissionStore(context) }
+    var permissionOnboardingComplete by remember { mutableStateOf(firstRunPermissionStore.isComplete()) }
+    var permissionOnboardingAttempted by remember { mutableStateOf(firstRunPermissionStore.attempted()) }
+    var permissionOnboardingInFlight by remember { mutableStateOf(false) }
+    val notificationPermissionOnboarding = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        permissionOnboardingInFlight = false
+        readinessRefresh++
+    }
+    val specialPermissionOnboarding = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        permissionOnboardingInFlight = false
+        readinessRefresh++
+    }
+    LaunchedEffect(readiness, permissionOnboardingAttempted, permissionOnboardingInFlight, permissionOnboardingComplete) {
+        if (permissionOnboardingComplete || permissionOnboardingInFlight) return@LaunchedEffect
+        val step = FirstRunPermissionFlow.next(
+            PermissionReadiness(
+                postNotifications = readiness.postNotifications,
+                notificationAccess = readiness.notificationAccess,
+                dndAccess = readiness.dndAccess,
+                exactAlarms = readiness.exactAlarms,
+            ),
+            permissionOnboardingAttempted,
+        )
+        if (step == null) {
+            firstRunPermissionStore.markComplete()
+            permissionOnboardingComplete = true
+            return@LaunchedEffect
+        }
+        firstRunPermissionStore.markAttempted(step)
+        permissionOnboardingAttempted = firstRunPermissionStore.attempted()
+        permissionOnboardingInFlight = true
+        if (step == PermissionOnboardingStep.PostNotifications) {
+            notificationPermissionOnboarding.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            runCatching { specialPermissionOnboarding.launch(step.settingsIntent(context)) }
+                .onFailure { permissionOnboardingInFlight = false }
+        }
+    }
     val activeSession by FocusRuntime.state.collectAsState()
     val focusing = activeSession != null
     LaunchedEffect(focusing, launchAction) {
@@ -250,7 +288,7 @@ fun NonotiApp(
             dismissButton = { TextButton(onClick = { emergencyPrompt = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
-    if (!focusing && !readiness.allReady && !setupDismissed) {
+    if (!focusing && permissionOnboardingComplete && !readiness.allReady && !setupDismissed) {
         SetupDialog(
             readiness = readiness,
             onReadinessChanged = { readinessRefresh++ },
@@ -533,13 +571,13 @@ private fun SetupDialog(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.setup_detail), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SetupPermissionLine(stringResource(R.string.notification_access), readiness.notificationAccess, Icons.Default.Notifications) {
-                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    runCatching { context.startActivity(PermissionOnboardingStep.NotificationAccess.settingsIntent(context)) }
                 }
                 SetupPermissionLine(stringResource(R.string.dnd_access), readiness.dndAccess, Icons.Default.Policy) {
-                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                    runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
                 }
                 SetupPermissionLine(stringResource(R.string.exact_alarms), readiness.exactAlarms, Icons.Default.Alarm) {
-                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")))
+                    runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))) }
                 }
                 SetupPermissionLine(stringResource(R.string.summary_notifications), readiness.postNotifications, Icons.Default.Inbox) {
                     notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -719,7 +757,7 @@ private fun SettingRow(title: String, detail: String) {
 
 private data class Readiness(val notificationAccess: Boolean, val dndAccess: Boolean, val zenRule: Boolean, val exactAlarms: Boolean, val postNotifications: Boolean, val compatibility: Boolean) {
     val preflightReady: Boolean get() = notificationAccess && dndAccess && zenRule && exactAlarms && postNotifications
-    val allReady: Boolean get() = notificationAccess && dndAccess && zenRule && exactAlarms && postNotifications && compatibility
+    val allReady: Boolean get() = preflightReady
 }
 
 @Composable

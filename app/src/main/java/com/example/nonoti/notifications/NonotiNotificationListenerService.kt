@@ -3,6 +3,7 @@ package com.example.nonoti.notifications
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.app.NotificationChannel
+import android.content.ComponentName
 import android.os.UserHandle
 import com.example.nonoti.NonotiApplication
 import com.example.nonoti.data.toEntity
@@ -39,8 +40,14 @@ class NonotiNotificationListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         FocusRuntime.setListenerConnected(false)
         FocusRuntime.current()?.let { session ->
-            CompatibilityStore(this).invalidate()
-            io.execute { NonotiPlatform.failOpen(applicationContext, session.id) }
+            NotificationListenerService.requestRebind(ComponentName(this, NonotiNotificationListenerService::class.java))
+            io.execute {
+                Thread.sleep(ListenerReconnectGraceMillis)
+                if (!FocusRuntime.isListenerConnected()) {
+                    CompatibilityStore(this).invalidate()
+                    NonotiPlatform.failOpen(applicationContext, session.id)
+                }
+            }
         }
         super.onListenerDisconnected()
     }
@@ -166,6 +173,7 @@ class NonotiNotificationListenerService : NotificationListenerService() {
 
     private companion object {
         const val SnoozeReconciliationGraceMillis = 2_000L
+        const val ListenerReconnectGraceMillis = 5_000L
     }
 }
 
