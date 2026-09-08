@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-This directory is an early-stage Android application. It currently contains product assets but no Gradle project, source code, tests, or local Git history. Do not describe planned commands or dependencies as operational until they exist.
+This directory contains the Android application implementation and product assets. The app uses a Gradle wrapper, one `app` module, Compose UI, Room/DataStore, Hilt, and local/instrumented tests. Do not describe unverified OEM compatibility as operational.
 
 ## Project structure and module organization
 
@@ -8,7 +8,7 @@ This directory is an early-stage Android application. It currently contains prod
 - `../../docs/elementary/nonoti/nonoti v0.1.0 产品定义.md` is the product specification and behavioral source of truth.
 - `.serena/` contains local agent metadata; it is not application code.
 
-When scaffolding begins, use one `app` module with feature-first packages under `app/src/main/java/`: `focus/`, `box/`, `settings/`, and `notifications/`. Put unit tests in `app/src/test/`, device and Compose UI tests in `app/src/androidTest/`, and Android resources in `app/src/main/res/`.
+The project uses one `app` module with feature-first packages under `app/src/main/java/`: `focus/`, `box/`, `settings/`, and `notifications/`. Unit tests live in `app/src/test/`, device and Compose UI tests in `app/src/androidTest/`, and Android resources in `app/src/main/res/`.
 
 ## Architecture overview
 
@@ -22,7 +22,7 @@ Keep notification listening, DND rules, alarms, and recovery logic behind explic
 
 ## Build, test, and development commands
 
-No Gradle wrapper exists yet. After the project is scaffolded, these should be the canonical tasks:
+Canonical tasks:
 
 ```bash
 ./gradlew :app:assembleDebug
@@ -31,7 +31,7 @@ No Gradle wrapper exists yet. After the project is scaffolded, these should be t
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Start the available emulator with `android emulator start OPPO_Reno10`, then confirm connectivity with `adb devices`. Update this section if generated Gradle or CI tasks differ.
+Start an available emulator with `android emulator start <avd-name>`, then confirm connectivity with `adb devices`. API 33/34/37 Google API emulators are currently usable in this workspace; the OPPO-named API 35 profile is not evidence of a real OEM ROM.
 
 ## Coding style and naming conventions
 
@@ -39,7 +39,7 @@ Use Kotlin with four-space indentation and Kotlin official formatting. Prefer im
 
 ## Testing guidelines
 
-No testing framework is configured yet; derive it from Gradle when added. Name unit tests `ClassNameTest` and instrumented tests `ClassNameInstrumentedTest`. Cover time boundaries, cross-midnight schedules, notification deduplication, permission revocation, process recovery, and Quiet Release. Device tests must report the Android version and ROM used.
+The project uses JUnit 4, Kotlin coroutine test utilities, Compose UI tests, Room test support, UI Automator dependencies, and JaCoCo. Name unit tests `ClassNameTest` and instrumented tests `ClassNameInstrumentedTest`. Cover time boundaries, cross-midnight schedules, notification deduplication, permission revocation, process recovery, and Quiet Release. Device tests must report the Android version and ROM used.
 
 ## Commit and pull request guidelines
 

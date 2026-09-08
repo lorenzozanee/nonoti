@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="emergency_access"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_emergency_short"
+        android:shortcutLongLabel="@string/shortcut_emergency_long">
+        <intent android:action="com.example.nonoti.EMERGENCY_ACCESS" android:targetPackage="com.example.nonoti" android:targetClass="com.example.nonoti.MainActivity" />
+    </shortcut>
+</shortcuts>

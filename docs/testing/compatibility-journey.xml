@@ -1,0 +1,13 @@
+<journey name="Focus compatibility self-test">
+  <description>Verify permission gating, controlled notification capture, quiet release, and Box persistence on one Android device.</description>
+  <actions>
+    <action>Install the current debug APK and grant Notification Access, Do Not Disturb access, exact alarms, and post notifications.</action>
+    <action>Open nonoti and verify that the four platform capabilities and Automatic Zen Rule are ready while compatibility self-test is not ready.</action>
+    <action>Tap Compatibility self-test, then tap Run 30-second test.</action>
+    <action>Verify that nonoti shows Focus active while the test runs and that Box content is inaccessible.</action>
+    <action>Wait for quiet release to finish, then verify that the compatibility test can be confirmed.</action>
+    <action>Confirm the compatibility test and verify that Start now becomes enabled.</action>
+    <action>Open Box and verify that the captured compatibility notification is present.</action>
+    <action>Verify that the nonoti Automatic Zen Rule is not active and exactly one Focus summary notification is present.</action>
+  </actions>
+</journey>
