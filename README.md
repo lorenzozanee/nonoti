@@ -23,13 +23,13 @@ nonoti 不会让消息消失。它在 Focus 期间安静地收集通知，并在
 
 ## Local first
 
-通知内容只保存在设备本机。v0.1.0 不需要账号、服务器、云同步或网络权限。
+通知内容只保存在设备本机。v0.1.1 不需要账号、服务器、云同步或网络权限。
 
 ## 当前状态
 
-v0.1.0 为预发布版本，尚未完成真实 OEM 手机验收。GitHub Release 中的 APK 未签名，需自行签名后才能安装。变更与验证范围见 [CHANGELOG.md](./CHANGELOG.md)。
+v0.1.1 为预发布版本，尚未完成真实 OEM 手机验收。GitHub Release 中的 APK 未签名，需自行签名后才能安装。变更与验证范围见 [CHANGELOG.md](./CHANGELOG.md)。
 
-nonoti v0.1.0 已实现 Android 13+ 的 Focus、Box 与 Settings 完整流程：分钟级每日计划、跨午夜、Start now、连续 Session 合并、长按删除、Emergency Access、通知过滤与去重、Quiet Release、Room 状态恢复、Automatic Zen Rule、权限失效 Fail Open 和设备兼容性自测。
+nonoti v0.1.1 已实现 Android 13+ 的 Focus、Box 与 Settings 完整流程：首次权限引导、简洁 Focus 首页、分钟级每日计划、跨午夜、Start now、连续 Session 合并、长按删除、Emergency Access、通知过滤与去重、Quiet Release、Room 状态恢复、Automatic Zen Rule、权限失效 Fail Open、设备兼容性自测、系统语言跟随和明暗主题切换。
 
 未完成 Notification Access、勿扰、精确闹钟、汇总通知权限或设备自测时，应用会阻止正式 Focus。系统大版本、ROM、设备指纹或应用版本变化后必须重新自测。
 

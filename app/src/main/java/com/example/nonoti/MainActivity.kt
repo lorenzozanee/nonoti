@@ -3,6 +3,8 @@ package com.example.nonoti
 import android.os.Bundle
 import android.content.Intent
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,12 +27,14 @@ class MainActivity : ComponentActivity() {
         setRecentsScreenshotEnabled(false)
         enableEdgeToEdge()
         setContent {
-            NonotiTheme {
+            val settingsViewModel: com.example.nonoti.settings.SettingsViewModel = hiltViewModel()
+            val settings by settingsViewModel.settings.collectAsState()
+            NonotiTheme(darkTheme = settings.darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     NonotiApp(
                         focusViewModel = hiltViewModel(),
                         boxViewModel = hiltViewModel(),
-                        settingsViewModel = hiltViewModel(),
+                        settingsViewModel = settingsViewModel,
                         launchAction = launchAction.value,
                         onLaunchActionConsumed = { launchAction.value = null },
                     )

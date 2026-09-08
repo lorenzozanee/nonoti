@@ -30,7 +30,7 @@ class ZenRuleController(private val context: Context) {
                     owner(),
                     ComponentName(context, MainActivity::class.java),
                     ConditionId,
-                    policy(allowCalls = true, allowAlarms = true),
+                    policy(allowCalls = false, allowAlarms = false),
                     NotificationManager.INTERRUPTION_FILTER_PRIORITY,
                     true,
                 ),

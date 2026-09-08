@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.clickable
@@ -49,7 +49,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -130,7 +129,6 @@ private enum class AppTab(@param:StringRes val labelRes: Int) : NavKey {
 }
 
 private enum class FocusDialog(@param:StringRes val titleRes: Int) {
-    Compatibility(R.string.compatibility_self_test),
     StartNow(R.string.start_now),
     NewBlock(R.string.new_focus_block),
 }
@@ -156,6 +154,9 @@ fun NonotiApp(
     var emergencyPrompt by remember { mutableStateOf(false) }
     var emergencyUnlocked by remember { mutableStateOf(false) }
     var emergencyActivityVersion by remember { mutableIntStateOf(0) }
+    var setupDismissed by remember { mutableStateOf(false) }
+    var readinessRefresh by remember { mutableIntStateOf(0) }
+    val readiness = rememberReadiness(readinessRefresh)
     val activeSession by FocusRuntime.state.collectAsState()
     val focusing = activeSession != null
     LaunchedEffect(focusing, launchAction) {
@@ -170,7 +171,11 @@ fun NonotiApp(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) emergencyUnlocked = false
+            if (event == Lifecycle.Event.ON_STOP) {
+                emergencyUnlocked = false
+                setupDismissed = false
+            }
+            if (event == Lifecycle.Event.ON_RESUME) readinessRefresh++
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -198,7 +203,7 @@ fun NonotiApp(
         }
     }
     Scaffold(
-        modifier = Modifier.pointerInput(emergencyUnlocked) {
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars).pointerInput(emergencyUnlocked) {
             if (emergencyUnlocked) {
                 awaitPointerEventScope {
                     while (true) {
@@ -208,7 +213,6 @@ fun NonotiApp(
                 }
             }
         },
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) }) },
         bottomBar = {
             if (!focusing || emergencyUnlocked) NavigationBar {
                 AppTab.entries.forEach { tab ->
@@ -229,7 +233,7 @@ fun NonotiApp(
             entryProvider = entryProvider {
                 entry<AppTab> { tab ->
                     when (tab) {
-                        AppTab.Focus -> FocusScreen(focusViewModel, Modifier, activeSession = activeSession, onEmergency = { emergencyPrompt = true })
+                        AppTab.Focus -> FocusScreen(focusViewModel, Modifier, activeSession = activeSession, readiness = readiness, onEmergency = { emergencyPrompt = true })
                         AppTab.Box -> if (focusing && !emergencyUnlocked) LockedBoxScreen(Modifier, onEmergency = { emergencyPrompt = true }) else BoxScreen(boxViewModel, Modifier, onSourceOpened = { emergencyUnlocked = false })
                         AppTab.Settings -> SettingsScreen(settingsViewModel, boxViewModel, Modifier)
                     }
@@ -246,11 +250,18 @@ fun NonotiApp(
             dismissButton = { TextButton(onClick = { emergencyPrompt = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
+    if (!focusing && !readiness.allReady && !setupDismissed) {
+        SetupDialog(
+            readiness = readiness,
+            onReadinessChanged = { readinessRefresh++ },
+            onDismiss = { setupDismissed = true },
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, activeSession: ActiveFocusSession?, onEmergency: () -> Unit) {
+private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, activeSession: ActiveFocusSession?, readiness: Readiness, onEmergency: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var confirmEnd by remember { mutableStateOf(false) }
@@ -322,32 +333,8 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
         }
         return
     }
-    var readinessRefresh by remember { mutableIntStateOf(0) }
-    var selfTestTick by remember { mutableIntStateOf(0) }
     var blockPendingDelete by remember { mutableStateOf<DailyFocusBlock?>(null) }
-    var notificationAccessPrompt by remember { mutableStateOf(false) }
-    val focusLifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(focusLifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) readinessRefresh++
-        }
-        focusLifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { focusLifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    val readiness = rememberReadiness(readinessRefresh)
-    LaunchedEffect(readiness.preflightReady) {
-        if (!readiness.preflightReady) {
-            delay(1_000L)
-            readinessRefresh++
-        }
-    }
     var dialog by remember { mutableStateOf<FocusDialog?>(null) }
-    LaunchedEffect(dialog, selfTestTick) {
-        if (dialog == FocusDialog.Compatibility && CompatibilityStore(context).isTestRunning()) {
-            delay(1_000L)
-            selfTestTick++
-        }
-    }
     val blocks by focusViewModel.blocks.collectAsState()
     Box(modifier.fillMaxSize()) {
         LazyColumn(
@@ -358,14 +345,6 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
             item {
                 Text(stringResource(R.string.tab_focus), style = MaterialTheme.typography.headlineSmall)
                 Text(stringResource(R.string.focus_intro), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            item {
-                ReadinessCard(
-                    readiness,
-                    onNotificationAccess = { notificationAccessPrompt = true },
-                    onCompatibility = { dialog = FocusDialog.Compatibility },
-                    onReadinessChanged = { readinessRefresh++ },
-                )
             }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -398,18 +377,7 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(if (activeDialog == FocusDialog.StartNow) R.string.start_now_detail else R.string.daily_block_detail))
-                    if (activeDialog == FocusDialog.Compatibility) {
-                        Text(stringResource(R.string.compatibility_instructions))
-                        val store = CompatibilityStore(context)
-                        when {
-                            store.isTestCompleted() -> Text(stringResource(R.string.test_completed))
-                            store.isTestRunning() -> Text(stringResource(R.string.test_running))
-                            else -> TextButton(
-                                onClick = { CompatibilityTestController.start(context); selfTestTick++ },
-                                enabled = readiness.preflightReady,
-                            ) { Text(stringResource(R.string.run_test)) }
-                        }
-                    } else if (activeDialog == FocusDialog.StartNow) {
+                    if (activeDialog == FocusDialog.StartNow) {
                         Text(stringResource(R.string.end_time))
                         OutlinedButton(onClick = {
                             TimePickerDialog(
@@ -448,13 +416,7 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (activeDialog == FocusDialog.Compatibility) {
-                        if (CompatibilityStore(context).isTestCompleted()) {
-                            CompatibilityStore(context).markPassed()
-                            readinessRefresh++
-                        }
-                        dialog = null
-                    } else if (activeDialog == FocusDialog.NewBlock) {
+                    if (activeDialog == FocusDialog.NewBlock) {
                         val candidate = DailyFocusBlock(startMinute, endMinute)
                         val error = FocusBlockRules.validate(candidate, blocks)
                         if (error == null) {
@@ -484,12 +446,10 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                         dialog = null
                     }
                 }, enabled = when (activeDialog) {
-                    FocusDialog.Compatibility -> CompatibilityStore(context).isTestCompleted()
                     FocusDialog.StartNow -> readiness.allReady
                     FocusDialog.NewBlock -> true
                 }) {
                     Text(stringResource(when (activeDialog) {
-                        FocusDialog.Compatibility -> R.string.verified_device
                         FocusDialog.NewBlock -> R.string.save
                         FocusDialog.StartNow -> R.string.start
                     }))
@@ -510,20 +470,6 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                 }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = { TextButton(onClick = { blockPendingDelete = null }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-    if (notificationAccessPrompt) {
-        AlertDialog(
-            onDismissRequest = { notificationAccessPrompt = false },
-            title = { Text(stringResource(R.string.notification_privacy)) },
-            text = { Text(stringResource(R.string.notification_privacy_detail)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    notificationAccessPrompt = false
-                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                }) { Text(stringResource(R.string.continue_settings)) }
-            },
-            dismissButton = { TextButton(onClick = { notificationAccessPrompt = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -565,43 +511,70 @@ private fun FocusBlockError.messageRes(): Int = when (this) {
 }
 
 @Composable
-private fun ReadinessCard(
+private fun SetupDialog(
     readiness: Readiness,
-    onNotificationAccess: () -> Unit,
-    onCompatibility: () -> Unit,
     onReadinessChanged: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onReadinessChanged() }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (readiness.allReady) Icons.Default.CheckCircle else Icons.Default.Policy, contentDescription = null)
-                Spacer(Modifier.padding(4.dp))
-                Text(stringResource(if (readiness.allReady) R.string.ready_for_focus else R.string.finish_setup), fontWeight = FontWeight.SemiBold)
-            }
-            ReadinessLine(stringResource(R.string.notification_access), readiness.notificationAccess, Icons.Default.Notifications, enabled = true, clickableWhenReady = true, onClick = onNotificationAccess)
-            ReadinessLine(stringResource(R.string.dnd_access), readiness.dndAccess, Icons.Default.Policy) { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
-            ReadinessLine(stringResource(R.string.automatic_zen_rule), readiness.zenRule, Icons.Default.Lock) { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
-            ReadinessLine(stringResource(R.string.exact_alarms), readiness.exactAlarms, Icons.Default.Alarm) { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))) }
-            ReadinessLine(stringResource(R.string.summary_notifications), readiness.postNotifications, Icons.Default.Inbox) {
-                notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-            }
-            ReadinessLine(stringResource(R.string.compatibility_self_test), readiness.compatibility, Icons.Default.CheckCircle, enabled = readiness.preflightReady, onClick = onCompatibility)
+    var selfTestTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(readiness.preflightReady, selfTestTick) {
+        if (!readiness.preflightReady || CompatibilityStore(context).isTestRunning()) {
+            delay(1_000L)
+            onReadinessChanged()
+            selfTestTick++
         }
     }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.setup_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.setup_detail), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SetupPermissionLine(stringResource(R.string.notification_access), readiness.notificationAccess, Icons.Default.Notifications) {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+                SetupPermissionLine(stringResource(R.string.dnd_access), readiness.dndAccess, Icons.Default.Policy) {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                }
+                SetupPermissionLine(stringResource(R.string.exact_alarms), readiness.exactAlarms, Icons.Default.Alarm) {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")))
+                }
+                SetupPermissionLine(stringResource(R.string.summary_notifications), readiness.postNotifications, Icons.Default.Inbox) {
+                    notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+                SetupPermissionLine(stringResource(R.string.compatibility_self_test), readiness.compatibility, Icons.Default.CheckCircle, enabled = readiness.preflightReady) {
+                    if (CompatibilityStore(context).isTestCompleted()) {
+                        CompatibilityStore(context).markPassed()
+                        onReadinessChanged()
+                    } else {
+                        CompatibilityTestController.start(context)
+                        selfTestTick++
+                    }
+                }
+                Text(stringResource(R.string.notification_privacy_detail), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (CompatibilityStore(context).isTestRunning()) {
+                    Text(stringResource(R.string.test_running), fontSize = 13.sp)
+                } else if (CompatibilityStore(context).isTestCompleted() && !readiness.compatibility) {
+                    Text(stringResource(R.string.test_completed), fontSize = 13.sp)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.not_now)) } },
+    )
 }
 
 @Composable
-private fun ReadinessLine(
+private fun SetupPermissionLine(
     label: String,
     ready: Boolean,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     enabled: Boolean = !ready,
-    clickableWhenReady: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = enabled && (!ready || clickableWhenReady), onClick = onClick).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = enabled && !ready, onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 10.dp))
         Text(label, modifier = Modifier.weight(1f))
         Text(stringResource(if (ready) R.string.ready else R.string.needs_access), color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontSize = 13.sp)
@@ -686,6 +659,10 @@ private fun SettingsScreen(viewModel: SettingsViewModel, boxViewModel: BoxViewMo
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item { Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
+        item { Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleLarge) }
+        item { ToggleSettingRow(stringResource(R.string.dark_mode), stringResource(R.string.dark_mode_detail), settings.darkTheme, viewModel::setDarkTheme) }
+        item { SettingRow(stringResource(R.string.app_language), stringResource(R.string.system_language)) }
+        item { HorizontalDivider() }
         item { Text(stringResource(R.string.readiness), style = MaterialTheme.typography.titleLarge) }
         item { SettingRow(stringResource(R.string.notification_access), stringResource(R.string.notification_access_detail)) }
         item { SettingRow(stringResource(R.string.dnd), stringResource(R.string.dnd_detail)) }

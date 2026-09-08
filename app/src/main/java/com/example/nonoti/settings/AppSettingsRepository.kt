@@ -17,10 +17,11 @@ import javax.inject.Inject
 private val Context.nonotiSettings by preferencesDataStore("settings")
 
 data class AppSettings(
-    val allowCalls: Boolean = true,
-    val allowAlarms: Boolean = true,
+    val allowCalls: Boolean = false,
+    val allowAlarms: Boolean = false,
     val retentionHours: Int = 24,
     val alwaysAllowedPackages: Set<String> = emptySet(),
+    val darkTheme: Boolean = true,
 )
 
 class AppSettingsRepository @Inject constructor(
@@ -29,10 +30,11 @@ class AppSettingsRepository @Inject constructor(
 ) {
     val settings: Flow<AppSettings> = context.nonotiSettings.data.map { values ->
         AppSettings(
-            allowCalls = values[AllowCalls] ?: true,
-            allowAlarms = values[AllowAlarms] ?: true,
+            allowCalls = values[AllowCalls] ?: false,
+            allowAlarms = values[AllowAlarms] ?: false,
             retentionHours = values[RetentionHours] ?: 24,
             alwaysAllowedPackages = values[AlwaysAllowedPackages] ?: emptySet(),
+            darkTheme = values[DarkTheme] ?: true,
         )
     }
 
@@ -60,6 +62,10 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
+    suspend fun setDarkTheme(value: Boolean) {
+        context.nonotiSettings.edit { it[DarkTheme] = value }
+    }
+
     suspend fun applyRetention() {
         val hours = settings.first().retentionHours
         boxRepository.deleteOlderThan(
@@ -73,5 +79,6 @@ class AppSettingsRepository @Inject constructor(
         val AllowAlarms = booleanPreferencesKey("allow_alarms")
         val RetentionHours = intPreferencesKey("retention_hours")
         val AlwaysAllowedPackages = stringSetPreferencesKey("always_allowed_packages")
+        val DarkTheme = booleanPreferencesKey("dark_theme")
     }
 }

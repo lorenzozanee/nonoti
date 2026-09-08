@@ -49,4 +49,8 @@ class SettingsViewModel @Inject constructor(
     fun setAlwaysAllowed(packageName: String, allowed: Boolean) {
         viewModelScope.launch { repository.setAlwaysAllowed(packageName, allowed) }
     }
+
+    fun setDarkTheme(value: Boolean) {
+        viewModelScope.launch { repository.setDarkTheme(value) }
+    }
 }

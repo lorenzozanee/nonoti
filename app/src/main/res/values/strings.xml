@@ -23,6 +23,9 @@
     <string name="end_focus_detail">Notifications will be released and the Focus summary will be sent.</string>
     <string name="end_focus">End Focus</string>
     <string name="focus_intro">Choose when messages wait for you.</string>
+    <string name="setup_title">Set up nonoti</string>
+    <string name="setup_detail">Grant the required access to use Focus. You can skip for now and review each permission later.</string>
+    <string name="not_now">Not now</string>
     <string name="today">Today</string>
     <string name="start_now">Start now</string>
     <string name="new_focus_block">New Focus block</string>
@@ -54,11 +57,8 @@
     <string name="block_short_error">Focus blocks must be at least 5 minutes.</string>
     <string name="block_overlap_error">This time overlaps another Focus block.</string>
     <string name="block_touch_error">Leave at least one minute between Focus blocks.</string>
-    <string name="ready_for_focus">Ready for Focus</string>
-    <string name="finish_setup">Finish setup before Focus</string>
     <string name="notification_access">Notification access</string>
     <string name="dnd_access">Do Not Disturb access</string>
-    <string name="automatic_zen_rule">Automatic Zen Rule</string>
     <string name="exact_alarms">Exact alarms</string>
     <string name="summary_notifications">Summary notifications</string>
     <string name="ready">Ready</string>
@@ -78,6 +78,11 @@
     <string name="box_locked">Box is locked</string>
     <string name="box_locked_detail">Focus is active. Messages will be available when it ends.</string>
     <string name="readiness">Readiness</string>
+    <string name="appearance">Appearance</string>
+    <string name="dark_mode">Dark mode</string>
+    <string name="dark_mode_detail">Use nonoti’s dark appearance</string>
+    <string name="app_language">Language</string>
+    <string name="system_language">Follows the system language</string>
     <string name="notification_access_detail">Required to capture messages</string>
     <string name="dnd">Do Not Disturb</string>
     <string name="dnd_detail">Required for zero-interruption Focus</string>

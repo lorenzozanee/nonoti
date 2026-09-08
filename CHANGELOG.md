@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.1 - 2026-09-08
+
+### Changed
+
+- Removed the app title bar and setup/readiness card from Focus for a cleaner home screen.
+- Moved required permissions and the compatibility self-test into a setup dialog that returns whenever incomplete setup re-enters the foreground.
+- Defaulted notification capture to all ordinary apps while calls and alarms remain blocked during Focus.
+- Added persistent light/dark appearance switching with dark mode as the default.
+- Added complete Simplified Chinese resources while continuing to follow the system language.
+
+### Validation and limitations
+
+- Unit tests, Android lint, Debug/Release builds, and six focused UI tests passed.
+- The UI flow was manually checked on an Android 14 Google API emulator.
+- Physical OEM behavior remains unverified.
+- This release provides an unsigned Release APK. It must be signed before installation.
+
 ## 0.1.0 - 2026-09-08
 
 Initial preview release for Android 13 and later.
