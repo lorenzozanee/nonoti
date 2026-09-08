@@ -12,7 +12,7 @@
 
 - Unit tests, Android lint, Debug build, and the API 37 Google API emulator Focus flow passed.
 - Physical OEM behavior remains unverified.
-- The Release APK is debug-signed for testing and is not production-signed.
+- The Release APK is signed with the Android debug certificate for testing and is not production-signed.
 
 ## 0.1.4 - 2026-09-08
 
