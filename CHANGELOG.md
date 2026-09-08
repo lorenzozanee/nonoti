@@ -13,7 +13,7 @@
 - Unit tests, Android lint, and Debug/Release builds passed.
 - Android force-stop remains outside the guarantee because it disables the app's services, receivers, and alarms.
 - Physical OEM behavior remains unverified.
-- The Release APK is unsigned and must be signed before installation.
+- The downloadable preview APK is the minified Release build signed with a debug certificate for testing; it is not production-signed.
 
 ## 0.1.2 - 2026-09-08
 
