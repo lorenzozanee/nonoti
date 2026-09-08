@@ -20,8 +20,12 @@
     <string name="retry_recovery">Retry recovery</string>
     <string name="ends_at">Ends at %1$s</string>
     <string name="hold_emergency">Hold for Emergency Access</string>
+    <string name="hold_emergency_hint">Press and hold to use Emergency Access.</string>
     <string name="end_focus_early">End Focus early</string>
     <string name="extend_end_time">Extend end time</string>
+    <string name="extend_later_hint">Choose a time later than the current end time.</string>
+    <string name="focus_extended">Focus end time extended.</string>
+    <string name="focus_extend_failed">Couldn’t extend Focus. Try again.</string>
     <string name="end_focus_question">End Focus early?</string>
     <string name="end_focus_detail">Notifications will be released and the Focus summary will be sent.</string>
     <string name="end_focus">End Focus</string>

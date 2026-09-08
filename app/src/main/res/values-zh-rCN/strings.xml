@@ -20,8 +20,12 @@
     <string name="retry_recovery">重试恢复</string>
     <string name="ends_at">结束时间：%1$s</string>
     <string name="hold_emergency">长按以紧急访问</string>
+    <string name="hold_emergency_hint">请长按以使用紧急访问。</string>
     <string name="end_focus_early">提前结束专注</string>
     <string name="extend_end_time">延长结束时间</string>
+    <string name="extend_later_hint">请选择晚于当前结束时间的时间。</string>
+    <string name="focus_extended">已延长专注结束时间。</string>
+    <string name="focus_extend_failed">无法延长专注，请重试。</string>
     <string name="end_focus_question">要提前结束专注吗？</string>
     <string name="end_focus_detail">通知将被释放，并发送专注摘要。</string>
     <string name="end_focus">结束专注</string>

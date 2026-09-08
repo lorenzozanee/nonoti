@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.TimePickerDialog
 import android.os.Build
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -112,6 +113,7 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -339,7 +341,10 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
             Text(
                 stringResource(R.string.hold_emergency),
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onEmergency).padding(12.dp),
+                modifier = Modifier.combinedClickable(
+                    onClick = { Toast.makeText(context, R.string.hold_emergency_hint, Toast.LENGTH_SHORT).show() },
+                    onLongClick = onEmergency,
+                ).padding(12.dp),
             )
             if (!activeSession.isReleasing) {
                 TextButton(onClick = { confirmEnd = true }) { Text(stringResource(R.string.end_focus_early)) }
@@ -351,7 +356,18 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                             val now = ZonedDateTime.now()
                             val requested = FocusSessionRules.startNow(now, LocalTime.of(hour, minute))
                             val endInstant = (requested as? StartNowResult.Accepted)?.window?.end
-                            if (endInstant != null) scope.launch(Dispatchers.IO) { NonotiPlatform.extendTo(context, endInstant) }
+                            if (endInstant == null || !endInstant.isAfter(Instant.ofEpochMilli(activeSession.endAtMillis))) {
+                                Toast.makeText(context, R.string.extend_later_hint, Toast.LENGTH_SHORT).show()
+                            } else {
+                                scope.launch {
+                                    val extended = withContext(Dispatchers.IO) { NonotiPlatform.extendTo(context, endInstant) }
+                                    Toast.makeText(
+                                        context,
+                                        if (extended) R.string.focus_extended else R.string.focus_extend_failed,
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            }
                         },
                         currentEnd.hour,
                         currentEnd.minute,
@@ -365,7 +381,7 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                 onDismissRequest = { confirmEnd = false },
                 title = { Text(stringResource(R.string.end_focus_question)) },
                 text = { Text(stringResource(R.string.end_focus_detail)) },
-                confirmButton = { TextButton(onClick = { confirmEnd = false; NonotiPlatform.release(context, activeSession.id) }) { Text(stringResource(R.string.end_focus)) } },
+                confirmButton = { TextButton(onClick = { confirmEnd = false; NonotiPlatform.endEarly(context, activeSession.id) }) { Text(stringResource(R.string.end_focus)) } },
                 dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text(stringResource(R.string.cancel)) } },
             )
         }

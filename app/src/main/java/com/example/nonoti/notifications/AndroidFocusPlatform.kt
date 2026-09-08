@@ -283,6 +283,13 @@ object NonotiPlatform {
         Thread { releaseBlocking(context, sessionId) }.start()
     }
 
+    fun endEarly(context: Context, sessionId: String) {
+        Thread {
+            PlannedFocusOccurrenceStore(context).skip(sessionId)
+            releaseBlocking(context, sessionId)
+        }.start()
+    }
+
     fun releaseBlocking(context: Context, sessionId: String) {
         FocusRuntime.beginRelease(sessionId)
         val app = context.applicationContext as NonotiApplication

@@ -70,6 +70,7 @@ class AndroidFocusSchedule(private val context: Context) : FocusSchedulePort {
         fun startOccurrence(context: Context, block: DailyFocusBlock, start: Instant, end: Instant) {
             val platform = AndroidFocusPlatform(context.applicationContext)
             val id = "planned-${block.startMinute}-${block.endMinute}-${start.toEpochMilli()}"
+            if (!PlannedFocusOccurrenceStore(context).shouldStart(id)) return
             NonotiPlatform.start(context, FocusSession(id, start, end), platform.readiness())
         }
     }
