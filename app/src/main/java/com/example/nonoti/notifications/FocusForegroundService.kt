@@ -27,12 +27,7 @@ class FocusForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val sessionId = intent?.getStringExtra(ExtraSessionId)
-        if (intent?.action == ActionRelease && sessionId != null) {
-            Thread { NonotiPlatform.releaseBlocking(applicationContext, sessionId) }.start()
-        } else {
-            Thread { NonotiPlatform.restore(applicationContext) }.start()
-        }
+        Thread { NonotiPlatform.restore(applicationContext) }.start()
         return START_STICKY
     }
 
@@ -74,18 +69,5 @@ class FocusForegroundService : Service() {
             )
         }
 
-        fun release(context: Context, sessionId: String): Boolean {
-            return runCatching {
-                ContextCompat.startForegroundService(
-                    context.applicationContext,
-                    Intent(context.applicationContext, FocusForegroundService::class.java)
-                        .setAction(ActionRelease)
-                        .putExtra(ExtraSessionId, sessionId),
-                )
-            }.isSuccess
-        }
-
-        private const val ActionRelease = "com.example.nonoti.action.RELEASE_IN_FOREGROUND"
-        private const val ExtraSessionId = "session_id"
     }
 }

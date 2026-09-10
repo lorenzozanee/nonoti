@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.nonoti"
         minSdk = 33
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 8
+        versionName = "0.1.7"
         testInstrumentationRunner = "com.example.nonoti.NonotiTestRunner"
     }
 

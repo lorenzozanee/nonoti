@@ -36,19 +36,19 @@ class AndroidFocusPlatform(private val context: Context) : FocusPlatformPort {
     override fun scheduleEnd(session: FocusSession): Boolean {
         val intent = Intent(context, FocusEndReceiver::class.java).setAction(FocusEndReceiver.ACTION_END).putExtra(FocusEndReceiver.EXTRA_SESSION_ID, session.id)
         val pending = PendingIntent.getBroadcast(context, session.id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val fallback = PendingIntent.getBroadcast(
-            context,
-            session.id.hashCode() xor Int.MIN_VALUE,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
         if (alarms?.canScheduleExactAlarms() != true) return false
         return runCatching {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, session.end.toEpochMilli(), pending)
-            alarms.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                session.end.plusSeconds(120).toEpochMilli(),
-                fallback,
+            alarms.setAlarmClock(
+                AlarmManager.AlarmClockInfo(
+                    session.end.toEpochMilli(),
+                    PendingIntent.getActivity(
+                        context,
+                        0,
+                        Intent(context, MainActivity::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                ),
+                pending,
             )
             true
         }.getOrDefault(false)
@@ -103,10 +103,10 @@ class AndroidFocusPlatform(private val context: Context) : FocusPlatformPort {
 
     fun cancelEnd(sessionId: String) {
         val intent = Intent(context, FocusEndReceiver::class.java).setAction(FocusEndReceiver.ACTION_END)
-        listOf(sessionId.hashCode(), sessionId.hashCode() xor Int.MIN_VALUE).forEach { requestCode ->
+        run {
             PendingIntent.getBroadcast(
                 context,
-                requestCode,
+                sessionId.hashCode(),
                 intent,
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
             )?.let { pending ->
@@ -129,9 +129,14 @@ class FocusEndReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_END) return
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return
-        if (!FocusForegroundService.release(context.applicationContext, sessionId)) {
-            NonotiPlatform.release(context.applicationContext, sessionId)
-        }
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                NonotiPlatform.releaseBlocking(context.applicationContext, sessionId)
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 
     companion object {
