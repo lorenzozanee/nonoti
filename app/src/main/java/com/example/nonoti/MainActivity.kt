@@ -1,16 +1,19 @@
 package com.example.nonoti
 
-import android.os.Bundle
 import android.content.Intent
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import android.graphics.Color
+import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.nonoti.theme.NonotiTheme
@@ -29,6 +32,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settingsViewModel: com.example.nonoti.settings.SettingsViewModel = hiltViewModel()
             val settings by settingsViewModel.settings.collectAsState()
+            SideEffect {
+                val barStyle = if (settings.darkTheme) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(
+                    statusBarStyle = barStyle,
+                    navigationBarStyle = barStyle,
+                )
+            }
             NonotiTheme(darkTheme = settings.darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     NonotiApp(

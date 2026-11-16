@@ -8,6 +8,12 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,16 +24,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
@@ -38,51 +43,44 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
-import androidx.compose.foundation.Image
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.pluralStringResource
-import androidx.annotation.StringRes
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.graphics.drawable.toBitmap
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.toBitmap
+import com.example.nonoti.theme.LocalApplePalette
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.example.nonoti.focus.DailyFocusBlock
 import com.example.nonoti.focus.FocusBlockError
 import com.example.nonoti.focus.FocusBlockRules
@@ -242,52 +240,83 @@ fun NonotiApp(
             }
         }
     }
-    Scaffold(
-        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars).pointerInput(emergencyUnlocked) {
-            if (emergencyUnlocked) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                        emergencyActivityVersion++
+    val palette = LocalApplePalette.current
+    val hazeState = rememberHazeState()
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(palette.canvas)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .pointerInput(emergencyUnlocked) {
+                    if (emergencyUnlocked) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent(PointerEventPass.Initial)
+                                emergencyActivityVersion++
+                            }
+                        }
                     }
-                }
+                },
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(state = hazeState),
+            ) {
+                NavDisplay(
+                    backStack = backStack,
+                    modifier = Modifier.fillMaxSize(),
+                    entryProvider = entryProvider {
+                        entry<AppTab> { tab ->
+                            when (tab) {
+                                AppTab.Focus -> FocusScreen(focusViewModel, Modifier, activeSession = activeSession, readiness = readiness, onEmergency = { emergencyPrompt = true })
+                                AppTab.Box -> if (focusing && !emergencyUnlocked) LockedBoxScreen(Modifier, onEmergency = { emergencyPrompt = true }) else BoxScreen(boxViewModel, Modifier, onSourceOpened = { emergencyUnlocked = false })
+                                AppTab.Settings -> SettingsScreen(settingsViewModel, boxViewModel, Modifier)
+                            }
+                        }
+                    },
+                )
             }
-        },
-        bottomBar = {
-            if (!focusing || emergencyUnlocked) NavigationBar {
-                AppTab.entries.forEach { tab ->
-                    if (focusing && tab == AppTab.Settings) return@forEach
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { navigate(tab) },
-                        icon = { Icon(if (tab == AppTab.Focus) Icons.Default.Lock else if (tab == AppTab.Box) Icons.Default.Inbox else Icons.Default.Settings, contentDescription = stringResource(tab.labelRes)) },
-                        label = { Text(stringResource(tab.labelRes)) },
-                    )
-                }
-            }
-        },
-    ) { padding ->
-        NavDisplay(
-            backStack = backStack,
-            modifier = Modifier.padding(padding),
-            entryProvider = entryProvider {
-                entry<AppTab> { tab ->
-                    when (tab) {
-                        AppTab.Focus -> FocusScreen(focusViewModel, Modifier, activeSession = activeSession, readiness = readiness, onEmergency = { emergencyPrompt = true })
-                        AppTab.Box -> if (focusing && !emergencyUnlocked) LockedBoxScreen(Modifier, onEmergency = { emergencyPrompt = true }) else BoxScreen(boxViewModel, Modifier, onSourceOpened = { emergencyUnlocked = false })
-                        AppTab.Settings -> SettingsScreen(settingsViewModel, boxViewModel, Modifier)
+            if (!focusing || emergencyUnlocked) {
+                val navItems = AppTab.entries
+                    .filter { !(focusing && it == AppTab.Settings) }
+                    .map { tab ->
+                        AppleNavItem(
+                            key = tab,
+                            label = stringResource(tab.labelRes),
+                            icon = when (tab) {
+                                AppTab.Focus -> Icons.Default.Lock
+                                AppTab.Box -> Icons.Default.Inbox
+                                AppTab.Settings -> Icons.Default.Settings
+                            },
+                        )
                     }
-                }
-            },
-        )
+                AppleGlassBottomBar(
+                    items = navItems,
+                    selectedKey = selectedTab,
+                    onSelect = ::navigate,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+        }
     }
     if (emergencyPrompt) {
-        AlertDialog(
+        AppleGlassDialog(
             onDismissRequest = { emergencyPrompt = false },
             title = { Text(stringResource(R.string.emergency_access)) },
-            text = { Text(stringResource(R.string.emergency_prompt)) },
-            confirmButton = { TextButton(onClick = { emergencyPrompt = false; emergencyUnlocked = true; navigate(AppTab.Box) }) { Text(stringResource(R.string.continue_action)) } },
-            dismissButton = { TextButton(onClick = { emergencyPrompt = false }) { Text(stringResource(R.string.cancel)) } },
+            text = { Text(stringResource(R.string.emergency_prompt), color = palette.mutedText) },
+            confirmButton = {
+                AppleGlassPillButton(
+                    onClick = { emergencyPrompt = false; emergencyUnlocked = true; navigate(AppTab.Box) },
+                    accent = true,
+                ) { Text(stringResource(R.string.continue_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { emergencyPrompt = false }) {
+                    Text(stringResource(R.string.cancel), color = palette.mutedText)
+                }
+            },
         )
     }
     if (!focusing && permissionOnboardingComplete && !readiness.allReady && !setupDismissed) {
@@ -303,6 +332,7 @@ fun NonotiApp(
 @Composable
 private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, activeSession: ActiveFocusSession?, readiness: Readiness, onEmergency: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val palette = LocalApplePalette.current
     val scope = rememberCoroutineScope()
     var confirmEnd by remember { mutableStateOf(false) }
     if (activeSession != null) {
@@ -312,14 +342,34 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Default.Warning, contentDescription = null)
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.focus_unavailable), style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.focus_recovery_detail), textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { Thread { NonotiPlatform.restore(context.applicationContext) }.start() }) {
-                    Text(stringResource(R.string.retry_recovery))
+                AppleGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = 12.dp,
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(palette.glassInnerPillTint),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = palette.errorText)
+                        }
+                        Text(stringResource(R.string.focus_unavailable), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.focus_recovery_detail), textAlign = TextAlign.Center, color = palette.mutedText)
+                        Spacer(Modifier.height(4.dp))
+                        AppleGlassPillButton(
+                            onClick = { Thread { NonotiPlatform.restore(context.applicationContext) }.start() },
+                            accent = true,
+                        ) {
+                            Text(stringResource(R.string.retry_recovery))
+                        }
+                    }
                 }
             }
             return
@@ -331,58 +381,126 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                 delay(1_000L)
             }
         }
-        Column(modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(64.dp))
-            Icon(Icons.Default.Lock, contentDescription = null)
-            Text(stringResource(if (activeSession.isReleasing) R.string.restoring_quietly else R.string.focus_active), style = MaterialTheme.typography.headlineSmall)
-            val end = Instant.ofEpochMilli(activeSession.endAtMillis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
-            Text(stringResource(R.string.ends_at, end))
-            Text(formatRemaining(activeSession.endAtMillis - nowMillis))
-            Text(
-                stringResource(R.string.hold_emergency),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.combinedClickable(
-                    onClick = { Toast.makeText(context, R.string.hold_emergency_hint, Toast.LENGTH_SHORT).show() },
-                    onLongClick = onEmergency,
-                ).padding(12.dp),
-            )
-            if (!activeSession.isReleasing) {
-                TextButton(onClick = { confirmEnd = true }) { Text(stringResource(R.string.end_focus_early)) }
-                TextButton(onClick = {
-                    val currentEnd = Instant.ofEpochMilli(activeSession.endAtMillis).atZone(ZoneId.systemDefault())
-                    TimePickerDialog(
-                        context,
-                        { _, hour, minute ->
-                            val now = ZonedDateTime.now()
-                            val requested = FocusSessionRules.startNow(now, LocalTime.of(hour, minute))
-                            val endInstant = (requested as? StartNowResult.Accepted)?.window?.end
-                            if (endInstant == null || !endInstant.isAfter(Instant.ofEpochMilli(activeSession.endAtMillis))) {
-                                Toast.makeText(context, R.string.extend_later_hint, Toast.LENGTH_SHORT).show()
-                            } else {
-                                scope.launch {
-                                    val extended = withContext(Dispatchers.IO) { NonotiPlatform.extendTo(context, endInstant) }
-                                    Toast.makeText(
-                                        context,
-                                        if (extended) R.string.focus_extended else R.string.focus_extend_failed,
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                }
-                            }
-                        },
-                        currentEnd.hour,
-                        currentEnd.minute,
-                        true,
-                    ).show()
-                }) { Text(stringResource(R.string.extend_end_time)) }
+        Column(
+            modifier.fillMaxSize().padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AppleGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                active = true,
+                elevation = 14.dp,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(28.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .clip(CircleShape)
+                            .background(palette.controlAccent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = palette.onControlAccent)
+                    }
+                    Text(
+                        stringResource(if (activeSession.isReleasing) R.string.restoring_quietly else R.string.focus_active),
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                    )
+                    val end = Instant.ofEpochMilli(activeSession.endAtMillis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(palette.glassInnerPillTint)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    ) {
+                        Text(stringResource(R.string.ends_at, end), fontSize = 13.sp, color = palette.mutedText)
+                    }
+                    Text(
+                        formatRemaining(activeSession.endAtMillis - nowMillis),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = palette.accentText,
+                    )
+                }
             }
+            Spacer(Modifier.height(18.dp))
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(palette.glassInnerPillTint)
+                    .combinedClickable(
+                        onClick = { Toast.makeText(context, R.string.hold_emergency_hint, Toast.LENGTH_SHORT).show() },
+                        onLongClick = onEmergency,
+                    )
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    stringResource(R.string.hold_emergency),
+                    color = palette.accentText,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            if (!activeSession.isReleasing) {
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AppleGlassPillButton(onClick = { confirmEnd = true }) {
+                        Text(stringResource(R.string.end_focus_early))
+                    }
+                    AppleGlassPillButton(
+                        onClick = {
+                            val currentEnd = Instant.ofEpochMilli(activeSession.endAtMillis).atZone(ZoneId.systemDefault())
+                            TimePickerDialog(
+                                context,
+                                { _, hour, minute ->
+                                    val now = ZonedDateTime.now()
+                                    val requested = FocusSessionRules.startNow(now, LocalTime.of(hour, minute))
+                                    val endInstant = (requested as? StartNowResult.Accepted)?.window?.end
+                                    if (endInstant == null || !endInstant.isAfter(Instant.ofEpochMilli(activeSession.endAtMillis))) {
+                                        Toast.makeText(context, R.string.extend_later_hint, Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        scope.launch {
+                                            val extended = withContext(Dispatchers.IO) { NonotiPlatform.extendTo(context, endInstant) }
+                                            Toast.makeText(
+                                                context,
+                                                if (extended) R.string.focus_extended else R.string.focus_extend_failed,
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
+                                    }
+                                },
+                                currentEnd.hour,
+                                currentEnd.minute,
+                                true,
+                            ).show()
+                        },
+                        accent = true,
+                    ) {
+                        Text(stringResource(R.string.extend_end_time))
+                    }
+                }
+            }
+            Spacer(Modifier.height(72.dp))
         }
         if (confirmEnd) {
-            AlertDialog(
+            AppleGlassDialog(
                 onDismissRequest = { confirmEnd = false },
                 title = { Text(stringResource(R.string.end_focus_question)) },
-                text = { Text(stringResource(R.string.end_focus_detail)) },
-                confirmButton = { TextButton(onClick = { confirmEnd = false; NonotiPlatform.endEarly(context, activeSession.id) }) { Text(stringResource(R.string.end_focus)) } },
-                dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text(stringResource(R.string.cancel)) } },
+                text = { Text(stringResource(R.string.end_focus_detail), color = palette.mutedText) },
+                confirmButton = {
+                    AppleGlassPillButton(
+                        onClick = { confirmEnd = false; NonotiPlatform.endEarly(context, activeSession.id) },
+                        accent = true,
+                    ) { Text(stringResource(R.string.end_focus)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmEnd = false }) {
+                        Text(stringResource(R.string.cancel), color = palette.mutedText)
+                    }
+                },
             )
         }
         return
@@ -394,23 +512,47 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 116.dp),
         ) {
             item {
                 Text(stringResource(R.string.tab_focus), style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(R.string.focus_intro), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.focus_intro), color = palette.mutedText)
             }
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(stringResource(R.string.today), style = MaterialTheme.typography.titleLarge)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { dialog = FocusDialog.StartNow }) { Text(stringResource(R.string.start_now)) }
-                        IconButton(onClick = { dialog = FocusDialog.NewBlock }) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_focus_block)) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AppleGlassPillButton(
+                            onClick = { dialog = FocusDialog.StartNow },
+                            accent = true,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
+                        ) {
+                            Text(stringResource(R.string.start_now), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        AppleGlassIconButton(onClick = { dialog = FocusDialog.NewBlock }) {
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_focus_block))
+                        }
                     }
                 }
             }
             if (blocks.isEmpty()) {
-                item { Text(stringResource(R.string.no_daily_blocks), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item {
+                    AppleGlassCard(Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(R.string.no_daily_blocks),
+                            color = palette.mutedText,
+                            modifier = Modifier.padding(20.dp),
+                        )
+                    }
+                }
             } else {
                 items(blocks, key = { "${it.startMinute}-${it.endMinute}" }) { block ->
                     FocusBlockRow(block, onLongClick = { blockPendingDelete = block })
@@ -425,15 +567,18 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
             mutableIntStateOf(if (activeDialog == FocusDialog.StartNow) defaultEnd.hour * 60 + defaultEnd.minute else 11 * 60 + 30)
         }
         var blockError by remember(activeDialog) { mutableStateOf<Int?>(null) }
-        AlertDialog(
+        AppleGlassDialog(
             onDismissRequest = { dialog = null },
             title = { Text(stringResource(activeDialog.titleRes)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(if (activeDialog == FocusDialog.StartNow) R.string.start_now_detail else R.string.daily_block_detail))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(if (activeDialog == FocusDialog.StartNow) R.string.start_now_detail else R.string.daily_block_detail),
+                        color = palette.mutedText,
+                    )
                     if (activeDialog == FocusDialog.StartNow) {
-                        Text(stringResource(R.string.end_time))
-                        OutlinedButton(onClick = {
+                        Text(stringResource(R.string.end_time), fontWeight = FontWeight.Medium)
+                        AppleGlassPillButton(onClick = {
                             TimePickerDialog(
                                 context,
                                 { _, hour, minute -> endMinute = hour * 60 + minute; blockError = null },
@@ -441,11 +586,11 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                                 endMinute % 60,
                                 true,
                             ).show()
-                        }) { Text(formatMinute(endMinute)) }
-                        blockError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                        }) { Text(formatMinute(endMinute), fontWeight = FontWeight.SemiBold) }
+                        blockError?.let { Text(stringResource(it), color = palette.errorText) }
                     } else {
-                        Text(stringResource(R.string.start_time))
-                        OutlinedButton(onClick = {
+                        Text(stringResource(R.string.start_time), fontWeight = FontWeight.Medium)
+                        AppleGlassPillButton(onClick = {
                             TimePickerDialog(
                                 context,
                                 { _, hour, minute -> startMinute = hour * 60 + minute; blockError = null },
@@ -453,9 +598,9 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                                 startMinute % 60,
                                 true,
                             ).show()
-                        }) { Text(formatMinute(startMinute)) }
-                        Text(stringResource(R.string.end_time))
-                        OutlinedButton(onClick = {
+                        }) { Text(formatMinute(startMinute), fontWeight = FontWeight.SemiBold) }
+                        Text(stringResource(R.string.end_time), fontWeight = FontWeight.Medium)
+                        AppleGlassPillButton(onClick = {
                             TimePickerDialog(
                                 context,
                                 { _, hour, minute -> endMinute = hour * 60 + minute; blockError = null },
@@ -463,67 +608,87 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
                                 endMinute % 60,
                                 true,
                             ).show()
-                        }) { Text(formatMinute(endMinute)) }
-                        blockError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                        }) { Text(formatMinute(endMinute), fontWeight = FontWeight.SemiBold) }
+                        blockError?.let { Text(stringResource(it), color = palette.errorText) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (activeDialog == FocusDialog.NewBlock) {
-                        val candidate = DailyFocusBlock(startMinute, endMinute)
-                        val error = FocusBlockRules.validate(candidate, blocks)
-                        if (error == null) {
-                            focusViewModel.save(candidate)
-                            dialog = null
+                AppleGlassPillButton(
+                    onClick = {
+                        if (activeDialog == FocusDialog.NewBlock) {
+                            val candidate = DailyFocusBlock(startMinute, endMinute)
+                            val error = FocusBlockRules.validate(candidate, blocks)
+                            if (error == null) {
+                                focusViewModel.save(candidate)
+                                dialog = null
+                            } else {
+                                blockError = error.messageRes()
+                            }
+                        } else if (activeDialog == FocusDialog.StartNow) {
+                            val now = ZonedDateTime.now()
+                            when (val result = FocusSessionRules.startNow(now, LocalTime.of(endMinute / 60, endMinute % 60))) {
+                                is StartNowResult.Accepted -> {
+                                    val continuous = FocusSessionRules.extendThroughDailyBlocks(result.window, blocks, now)
+                                    val session = FocusSession("manual-${System.currentTimeMillis()}", continuous.start, continuous.end)
+                                    if (NonotiPlatform.start(context, session, AndroidFocusPlatform(context).readiness()) == com.example.nonoti.notifications.FocusStartResult.Started) {
+                                        dialog = null
+                                    }
+                                }
+                                is StartNowResult.Rejected -> {
+                                    blockError = when (result.reason) {
+                                        StartNowError.TooShort -> R.string.start_now_too_short
+                                        StartNowError.TooLong -> R.string.start_now_too_long
+                                    }
+                                }
+                            }
                         } else {
-                            blockError = error.messageRes()
+                            dialog = null
                         }
-                    } else if (activeDialog == FocusDialog.StartNow) {
-                        val now = ZonedDateTime.now()
-                        when (val result = FocusSessionRules.startNow(now, LocalTime.of(endMinute / 60, endMinute % 60))) {
-                            is StartNowResult.Accepted -> {
-                                val continuous = FocusSessionRules.extendThroughDailyBlocks(result.window, blocks, now)
-                                val session = FocusSession("manual-${System.currentTimeMillis()}", continuous.start, continuous.end)
-                                if (NonotiPlatform.start(context, session, AndroidFocusPlatform(context).readiness()) == com.example.nonoti.notifications.FocusStartResult.Started) {
-                                    dialog = null
-                                }
-                            }
-                            is StartNowResult.Rejected -> {
-                                blockError = when (result.reason) {
-                                    StartNowError.TooShort -> R.string.start_now_too_short
-                                    StartNowError.TooLong -> R.string.start_now_too_long
-                                }
-                            }
-                        }
-                    } else {
-                        dialog = null
-                    }
-                }, enabled = when (activeDialog) {
-                    FocusDialog.StartNow -> readiness.allReady
-                    FocusDialog.NewBlock -> true
-                }) {
+                    },
+                    enabled = when (activeDialog) {
+                        FocusDialog.StartNow -> readiness.allReady
+                        FocusDialog.NewBlock -> true
+                    },
+                    accent = true,
+                ) {
                     Text(stringResource(when (activeDialog) {
                         FocusDialog.NewBlock -> R.string.save
                         FocusDialog.StartNow -> R.string.start
                     }))
                 }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = {
+                TextButton(onClick = { dialog = null }) {
+                    Text(stringResource(R.string.cancel), color = palette.mutedText)
+                }
+            },
         )
     }
     blockPendingDelete?.let { block ->
-        AlertDialog(
+        AppleGlassDialog(
             onDismissRequest = { blockPendingDelete = null },
             title = { Text(stringResource(R.string.delete_focus_question)) },
-            text = { Text(stringResource(R.string.delete_focus_detail, "${formatMinute(block.startMinute)} → ${formatMinute(block.endMinute)}")) },
-            confirmButton = {
-                TextButton(onClick = {
-                    focusViewModel.delete(block)
-                    blockPendingDelete = null
-                }) { Text(stringResource(R.string.delete)) }
+            text = {
+                Text(
+                    stringResource(R.string.delete_focus_detail, "${formatMinute(block.startMinute)} → ${formatMinute(block.endMinute)}"),
+                    color = palette.mutedText,
+                )
             },
-            dismissButton = { TextButton(onClick = { blockPendingDelete = null }) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = {
+                AppleGlassPillButton(
+                    onClick = {
+                        focusViewModel.delete(block)
+                        blockPendingDelete = null
+                    },
+                    accent = true,
+                ) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { blockPendingDelete = null }) {
+                    Text(stringResource(R.string.cancel), color = palette.mutedText)
+                }
+            },
         )
     }
 }
@@ -531,27 +696,52 @@ private fun FocusScreen(focusViewModel: FocusViewModel, modifier: Modifier, acti
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FocusBlockRow(block: DailyFocusBlock, onLongClick: () -> Unit) {
+    val palette = LocalApplePalette.current
     val status = FocusBlockStatuses.at(block, ZonedDateTime.now())
     val statusLabel = when (status) {
         FocusBlockStatus.Upcoming -> stringResource(R.string.upcoming)
         FocusBlockStatus.Active -> stringResource(R.string.focusing)
         FocusBlockStatus.Finished -> stringResource(R.string.finished)
     }
-    Card(
+    val isActive = status == FocusBlockStatus.Active
+    AppleGlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (status == FocusBlockStatus.Finished) 0.55f else 1f)
-            .combinedClickable(onClick = {}, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (status == FocusBlockStatus.Active) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface,
-        ),
+            .alpha(if (status == FocusBlockStatus.Finished) 0.55f else 1f),
+        active = isActive,
+        elevation = if (isActive) 12.dp else 6.dp,
     ) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text("${formatMinute(block.startMinute)} → ${formatMinute(block.endMinute)}", fontWeight = FontWeight.SemiBold)
-                Text(statusLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = {}, onLongClick = onLongClick)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("${formatMinute(block.startMinute)} → ${formatMinute(block.endMinute)}", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                Text(
+                    statusLabel,
+                    color = if (isActive) palette.accentText else palette.mutedText,
+                    fontSize = 13.sp,
+                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                )
             }
-            Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.focus_block))
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(if (isActive) palette.controlAccent else palette.glassInnerPillTint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = stringResource(R.string.focus_block),
+                    tint = if (isActive) palette.onControlAccent else palette.mutedText,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -571,6 +761,7 @@ private fun SetupDialog(
     onDismiss: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val palette = LocalApplePalette.current
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onReadinessChanged() }
     var selfTestTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(readiness.preflightReady, selfTestTick) {
@@ -580,12 +771,12 @@ private fun SetupDialog(
             selfTestTick++
         }
     }
-    AlertDialog(
+    AppleGlassDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.setup_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.setup_detail), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.setup_detail), color = palette.mutedText)
                 SetupPermissionLine(stringResource(R.string.notification_access), readiness.notificationAccess, Icons.Default.Notifications) {
                     runCatching { context.startActivity(PermissionOnboardingStep.NotificationAccess.settingsIntent(context)) }
                 }
@@ -607,16 +798,20 @@ private fun SetupDialog(
                         selfTestTick++
                     }
                 }
-                Text(stringResource(R.string.notification_privacy_detail), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.notification_privacy_detail), fontSize = 13.sp, color = palette.mutedText)
                 if (CompatibilityStore(context).isTestRunning()) {
-                    Text(stringResource(R.string.test_running), fontSize = 13.sp)
+                    Text(stringResource(R.string.test_running), fontSize = 13.sp, color = palette.accentText)
                 } else if (CompatibilityStore(context).isTestCompleted() && !readiness.compatibility) {
-                    Text(stringResource(R.string.test_completed), fontSize = 13.sp)
+                    Text(stringResource(R.string.test_completed), fontSize = 13.sp, color = palette.accentText)
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.not_now)) } },
+        dismissButton = {
+            AppleGlassPillButton(onClick = onDismiss) {
+                Text(stringResource(R.string.not_now))
+            }
+        },
     )
 }
 
@@ -628,10 +823,24 @@ private fun SetupPermissionLine(
     enabled: Boolean = !ready,
     onClick: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = enabled && !ready, onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 10.dp))
-        Text(label, modifier = Modifier.weight(1f))
-        Text(stringResource(if (ready) R.string.ready else R.string.needs_access), color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontSize = 13.sp)
+    val palette = LocalApplePalette.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.glassInnerPillTint)
+            .clickable(enabled = enabled && !ready, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 10.dp), tint = if (ready) palette.accentText else palette.mutedText)
+        Text(label, modifier = Modifier.weight(1f), fontSize = 14.sp)
+        Text(
+            stringResource(if (ready) R.string.ready else R.string.needs_access),
+            color = if (ready) palette.accentText else palette.errorText,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -639,40 +848,80 @@ private fun SetupPermissionLine(
 private fun BoxScreen(viewModel: BoxViewModel, modifier: Modifier, onSourceOpened: () -> Unit) {
     val notifications by viewModel.notifications.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val palette = LocalApplePalette.current
     var sourceOpenFailed by remember { mutableStateOf(false) }
-    LazyColumn(modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)) {
-        item { Text(stringResource(R.string.tab_box), style = MaterialTheme.typography.headlineSmall) }
-        item { Text(stringResource(R.string.box_intro), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    LazyColumn(
+        modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 116.dp),
+    ) {
+        item {
+            Text(stringResource(R.string.tab_box), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.box_intro), color = palette.mutedText)
+        }
         if (sourceOpenFailed) {
-            item { Text(stringResource(R.string.source_unavailable), color = MaterialTheme.colorScheme.error) }
+            item { Text(stringResource(R.string.source_unavailable), color = palette.errorText) }
         }
         if (notifications.isEmpty()) {
             item {
-                Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
-                    Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.padding(bottom = 8.dp))
+                AppleGlassCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(palette.glassInnerPillTint),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.Inbox, contentDescription = null, tint = palette.accentText)
+                        }
+                        Spacer(Modifier.height(4.dp))
                         Text(stringResource(R.string.box_empty), fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.box_empty_detail), fontSize = 14.sp)
+                        Text(stringResource(R.string.box_empty_detail), fontSize = 14.sp, color = palette.mutedText, textAlign = TextAlign.Center)
                     }
                 }
             }
         } else {
             items(notifications, key = { "${it.sessionId}:${it.notificationKey}" }) { item ->
-                Card(onClick = {
-                    sourceOpenFailed = !FocusRuntime.openSource(context, item)
-                    if (!sourceOpenFailed) onSourceOpened()
-                }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppleGlassCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                sourceOpenFailed = !FocusRuntime.openSource(context, item)
+                                if (!sourceOpenFailed) onSourceOpened()
+                            }
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         val appInfo = remember(item.packageName) { runCatching { context.packageManager.getApplicationInfo(item.packageName, 0) }.getOrNull() }
                         val icon = remember(appInfo) { appInfo?.let { context.packageManager.getApplicationIcon(it).toBitmap(96, 96).asImageBitmap() } }
-                        if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(40.dp)) else Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(40.dp))
+                        if (icon != null) {
+                            Image(icon, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+                        } else {
+                            Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(40.dp), tint = palette.accentText)
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(appInfo?.let { context.packageManager.getApplicationLabel(it).toString() } ?: item.packageName, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                appInfo?.let { context.packageManager.getApplicationLabel(it).toString() } ?: item.packageName,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = palette.accentText,
+                            )
                             Text(item.title ?: stringResource(R.string.notification_fallback_title), fontWeight = FontWeight.SemiBold)
                             item.text?.let { Text(it) }
-                            item.subText?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            item.subText?.let { Text(it, fontSize = 13.sp, color = palette.mutedText) }
                             val sameAppCount = notifications.count { it.packageName == item.packageName && it.sessionId == item.sessionId }
-                            Text(pluralStringResource(R.plurals.notification_metadata, sameAppCount, sameAppCount, relativeTimeText(item.firstCapturedAtMillis), relativeTimeText(item.lastUpdatedAtMillis)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                pluralStringResource(R.plurals.notification_metadata, sameAppCount, sameAppCount, relativeTimeText(item.firstCapturedAtMillis), relativeTimeText(item.lastUpdatedAtMillis)),
+                                fontSize = 12.sp,
+                                color = palette.mutedText,
+                            )
                             Text(
                                 buildString {
                                     append(item.packageName)
@@ -680,94 +929,177 @@ private fun BoxScreen(viewModel: BoxViewModel, modifier: Modifier, onSourceOpene
                                     item.conversationId?.let { append(" · "); append(it) }
                                 },
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = palette.mutedText,
                             )
-                            Text(stringResource(if (item.isInSystemNotificationBar) R.string.captured else R.string.no_longer_in_shade), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                stringResource(if (item.isInSystemNotificationBar) R.string.captured else R.string.no_longer_in_shade),
+                                fontSize = 12.sp,
+                                color = palette.mutedText,
+                            )
                         }
                     }
                 }
             }
-            item { TextButton(onClick = viewModel::clear) { Text(stringResource(R.string.clear_box)) } }
+            item {
+                AppleGlassPillButton(onClick = viewModel::clear) {
+                    Text(stringResource(R.string.clear_box))
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun LockedBoxScreen(modifier: Modifier, onEmergency: () -> Unit) {
-    Column(modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    val palette = LocalApplePalette.current
+    Column(
+        modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AppleGlassCard(modifier = Modifier.fillMaxWidth(), elevation = 12.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(palette.glassInnerPillTint),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = palette.accentText)
+                }
+                Text(stringResource(R.string.box_locked), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.box_locked_detail), color = palette.mutedText, textAlign = TextAlign.Center)
+                val emergencyLabel = stringResource(R.string.emergency_access)
+                AppleGlassPillButton(
+                    onClick = onEmergency,
+                    accent = true,
+                    modifier = Modifier.semantics { contentDescription = emergencyLabel },
+                ) {
+                    Text(emergencyLabel)
+                }
+            }
+        }
         Spacer(Modifier.height(72.dp))
-        Icon(Icons.Default.Lock, contentDescription = null)
-        Text(stringResource(R.string.box_locked), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.box_locked_detail))
-        val emergencyLabel = stringResource(R.string.emergency_access)
-        TextButton(onClick = onEmergency, modifier = Modifier.semantics { contentDescription = emergencyLabel }) { Text(emergencyLabel) }
     }
 }
 
 @Composable
 private fun SettingsScreen(viewModel: SettingsViewModel, boxViewModel: BoxViewModel, modifier: Modifier) {
     val settings by viewModel.settings.collectAsState()
+    val palette = LocalApplePalette.current
+    val retentionOptions = listOf(24 to R.string.retention_24_hours, 168 to R.string.retention_7_days, 720 to R.string.retention_30_days)
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 116.dp),
     ) {
-        item { Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp)) }
-        item { Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleLarge) }
-        item { ToggleSettingRow(stringResource(R.string.dark_mode), stringResource(R.string.dark_mode_detail), settings.darkTheme, viewModel::setDarkTheme) }
-        item { SettingRow(stringResource(R.string.app_language), stringResource(R.string.system_language)) }
-        item { HorizontalDivider() }
-        item { Text(stringResource(R.string.readiness), style = MaterialTheme.typography.titleLarge) }
-        item { SettingRow(stringResource(R.string.notification_access), stringResource(R.string.notification_access_detail)) }
-        item { SettingRow(stringResource(R.string.dnd), stringResource(R.string.dnd_detail)) }
-        item { SettingRow(stringResource(R.string.emergency_access), stringResource(R.string.emergency_access_detail)) }
-        item { HorizontalDivider() }
-        item { Text(stringResource(R.string.notification_policy), style = MaterialTheme.typography.titleLarge) }
-        item { ToggleSettingRow(stringResource(R.string.allow_calls), stringResource(R.string.allow_calls_detail), settings.allowCalls, viewModel::setAllowCalls) }
-        item { ToggleSettingRow(stringResource(R.string.allow_alarms), stringResource(R.string.allow_alarms_detail), settings.allowAlarms, viewModel::setAllowAlarms) }
-        item { Text(stringResource(R.string.always_allowed_apps), style = MaterialTheme.typography.titleLarge) }
-        if (viewModel.installedApps.isEmpty()) {
-            item { Text(stringResource(R.string.no_launchable_apps), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        } else {
-            items(viewModel.installedApps, key = { it.packageName }) { app ->
-                ToggleSettingRow(
-                    app.label,
-                    app.packageName,
-                    app.packageName in settings.alwaysAllowedPackages,
-                    { checked -> viewModel.setAlwaysAllowed(app.packageName, checked) },
-                )
-            }
-        }
-        item { HorizontalDivider() }
-        item { Text(stringResource(R.string.box_data), style = MaterialTheme.typography.titleLarge) }
+        item { Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineSmall) }
+
+        item { Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp)) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                listOf(24 to R.string.retention_24_hours, 168 to R.string.retention_7_days, 720 to R.string.retention_30_days).forEach { (hours, labelRes) ->
-                    TextButton(onClick = { viewModel.setRetentionHours(hours) }, enabled = settings.retentionHours != hours) { Text(stringResource(labelRes)) }
+            AppleGlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    ToggleSettingRow(stringResource(R.string.dark_mode), stringResource(R.string.dark_mode_detail), settings.darkTheme, viewModel::setDarkTheme)
+                    HorizontalDivider(color = palette.divider)
+                    SettingRow(stringResource(R.string.app_language), stringResource(R.string.system_language))
                 }
             }
         }
-        item { TextButton(onClick = boxViewModel::clear) { Text(stringResource(R.string.clear_box)) } }
-        item { SettingRow(stringResource(R.string.privacy), stringResource(R.string.privacy_detail)) }
+
+        item { Text(stringResource(R.string.readiness), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp)) }
+        item {
+            AppleGlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    SettingRow(stringResource(R.string.notification_access), stringResource(R.string.notification_access_detail))
+                    HorizontalDivider(color = palette.divider)
+                    SettingRow(stringResource(R.string.dnd), stringResource(R.string.dnd_detail))
+                    HorizontalDivider(color = palette.divider)
+                    SettingRow(stringResource(R.string.emergency_access), stringResource(R.string.emergency_access_detail))
+                }
+            }
+        }
+
+        item { Text(stringResource(R.string.notification_policy), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp)) }
+        item {
+            AppleGlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    ToggleSettingRow(stringResource(R.string.allow_calls), stringResource(R.string.allow_calls_detail), settings.allowCalls, viewModel::setAllowCalls)
+                    HorizontalDivider(color = palette.divider)
+                    ToggleSettingRow(stringResource(R.string.allow_alarms), stringResource(R.string.allow_alarms_detail), settings.allowAlarms, viewModel::setAllowAlarms)
+                }
+            }
+        }
+
+        item { Text(stringResource(R.string.always_allowed_apps), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp)) }
+        if (viewModel.installedApps.isEmpty()) {
+            item {
+                AppleGlassCard(Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.no_launchable_apps), color = palette.mutedText, modifier = Modifier.padding(16.dp))
+                }
+            }
+        } else {
+            items(viewModel.installedApps, key = { it.packageName }) { app ->
+                AppleGlassCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = 4.dp) {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        ToggleSettingRow(
+                            app.label,
+                            app.packageName,
+                            app.packageName in settings.alwaysAllowedPackages,
+                            { checked -> viewModel.setAlwaysAllowed(app.packageName, checked) },
+                        )
+                    }
+                }
+            }
+        }
+
+        item { Text(stringResource(R.string.box_data), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp)) }
+        item {
+            AppleGlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    val selectedOption = retentionOptions.firstOrNull { it.first == settings.retentionHours } ?: retentionOptions.first()
+                    AppleGlassSegmentedControl(
+                        options = retentionOptions,
+                        selectedOption = selectedOption,
+                        onSelect = { viewModel.setRetentionHours(it.first) },
+                        label = { stringResource(it.second) },
+                    )
+                    AppleGlassPillButton(onClick = boxViewModel::clear) {
+                        Text(stringResource(R.string.clear_box))
+                    }
+                    HorizontalDivider(color = palette.divider)
+                    SettingRow(stringResource(R.string.privacy), stringResource(R.string.privacy_detail))
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun ToggleSettingRow(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
+    val palette = LocalApplePalette.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, fontWeight = FontWeight.Medium)
-            Text(detail, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(detail, fontSize = 13.sp, color = palette.mutedText)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        AppleGlassSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun SettingRow(title: String, detail: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Medium); Text(detail, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        Icon(Icons.Default.Settings, contentDescription = null)
+    val palette = LocalApplePalette.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(detail, fontSize = 13.sp, color = palette.mutedText)
+        }
+        Icon(Icons.Default.Settings, contentDescription = null, tint = palette.mutedText, modifier = Modifier.size(18.dp))
     }
 }
 

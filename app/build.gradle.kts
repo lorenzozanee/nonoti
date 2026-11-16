@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.nonoti"
         minSdk = 33
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.1.7"
+        versionCode = 9
+        versionName = "0.1.8"
         testInstrumentationRunner = "com.example.nonoti.NonotiTestRunner"
     }
 
@@ -81,6 +81,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.material.icons)
+  implementation(libs.haze)
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests
