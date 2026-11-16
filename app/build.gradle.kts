@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -5,6 +7,39 @@ plugins {
   alias(libs.plugins.hilt)
   alias(libs.plugins.ksp)
   jacoco
+}
+
+val signingProperties = Properties().apply {
+    val propertiesFile = rootProject.file("signing.properties")
+    if (propertiesFile.isFile) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+val releaseSigningValues = mapOf(
+    "storeFile" to "NONOTI_KEYSTORE_PATH",
+    "storePassword" to "NONOTI_STORE_PASSWORD",
+    "keyAlias" to "NONOTI_KEY_ALIAS",
+    "keyPassword" to "NONOTI_KEY_PASSWORD",
+).mapValues { (property, environment) ->
+    providers.environmentVariable(environment).orNull ?: signingProperties.getProperty(property)
+}
+val releaseKeystore = releaseSigningValues["storeFile"]
+    ?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+val validateReleaseSigning = tasks.register("validateReleaseSigning") {
+    val missingProperties = releaseSigningValues.filterValues { it.isNullOrBlank() }.keys
+    val keystore = releaseKeystore
+    doLast {
+        check(missingProperties.isEmpty()) {
+            "Missing release signing configuration: ${missingProperties.joinToString()}. " +
+                "See .github/RELEASING.md."
+        }
+        check(keystore?.isFile == true) { "Release keystore does not exist. See .github/RELEASING.md." }
+    }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseSigning)
 }
 
 android {
@@ -19,11 +54,19 @@ android {
         testInstrumentationRunner = "com.example.nonoti.NonotiTestRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = releaseKeystore
+            storePassword = releaseSigningValues["storePassword"]
+            keyAlias = releaseSigningValues["keyAlias"]
+            keyPassword = releaseSigningValues["keyPassword"]
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -1,29 +1,63 @@
 package com.example.nonoti
 
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
-import com.example.nonoti.data.FocusBlockEntity
 import androidx.lifecycle.Lifecycle
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import com.example.nonoti.data.FocusBlockEntity
+import com.example.nonoti.notifications.AndroidFocusPlatform
+import com.example.nonoti.notifications.FocusRuntime
+import com.example.nonoti.ui.FirstRunPermissionStore
 import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class NonotiAppInstrumentedTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createEmptyComposeRule()
+
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context get() = instrumentation.targetContext
+    private val application get() = context.applicationContext as NonotiApplication
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @Before
+    fun setUp() {
+        FirstRunPermissionStore(context).markComplete()
+        AndroidFocusPlatform(context).disableZen()
+        FocusRuntime.stop()
+        runBlocking {
+            application.database.dao().clearFocusSession()
+            application.database.dao().focusBlocks().forEach { block ->
+                application.database.dao().deleteFocusBlock(block.startMinute, block.endMinute)
+            }
+        }
+    }
+
+    @After
+    fun tearDown() {
+        scenario?.close()
+        setNotificationAccess(true)
+    }
 
     @Test
     fun focusShellShowsReadinessAndNavigation() {
+        launchActivity()
         dismissSetupIfShown()
         composeRule.onNodeWithText("Choose when messages wait for you.").assertIsDisplayed()
         composeRule.onNodeWithText("Today").assertIsDisplayed()
-        composeRule.onNodeWithText("nonoti").assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.app_name)).assertDoesNotExist()
         composeRule.onNodeWithText("Ready for Focus").assertDoesNotExist()
         composeRule.onNodeWithText("Finish setup before Focus").assertDoesNotExist()
         composeRule.onNodeWithText("Notification access").assertDoesNotExist()
@@ -37,6 +71,7 @@ class NonotiAppInstrumentedTest {
 
     @Test
     fun addFocusBlockOffersMinutePrecisionTimeControls() {
+        launchActivity()
         dismissSetupIfShown()
         composeRule.onNodeWithContentDescription("Add Focus block").performClick()
 
@@ -46,6 +81,7 @@ class NonotiAppInstrumentedTest {
 
     @Test
     fun startNowUsesAnExplicitEndTime() {
+        launchActivity()
         dismissSetupIfShown()
         composeRule.onNodeWithText("Start now").performClick()
 
@@ -53,28 +89,33 @@ class NonotiAppInstrumentedTest {
     }
 
     @Test
-    fun setupExplainsNotificationPrivacyBeforeOpeningSystemSettings() {
-        composeRule.onNodeWithText("Set up nonoti").assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "nonoti can read notification titles and message text from other apps. Captured content stays on this device and is never sent to a server.",
-        ).assertIsDisplayed()
+    fun incompleteSetupExplainsLocalNotificationStorage() {
+        launchActivity(notificationAccess = false)
+        composeRule.onNodeWithText(context.getString(R.string.setup_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.notification_privacy_detail))
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
     fun incompleteSetupReappearsWhenAppIsEnteredAgain() {
-        composeRule.onNodeWithText("Not now").performClick()
-        composeRule.onNodeWithText("Set up nonoti").assertDoesNotExist()
+        val activity = launchActivity(notificationAccess = false)
+        val title = context.getString(R.string.setup_title)
+        composeRule.onNodeWithText(title).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.not_now)).assertIsDisplayed().performClick()
+        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(title).fetchSemanticsNodes().isEmpty() }
+        composeRule.onNodeWithText(title).assertDoesNotExist()
 
-        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        activity.moveToState(Lifecycle.State.CREATED)
+        activity.moveToState(Lifecycle.State.RESUMED)
 
-        composeRule.onNodeWithText("Set up nonoti").assertIsDisplayed()
+        composeRule.onNodeWithText(title).assertIsDisplayed()
     }
 
     @Test
     fun longPressingFocusBlockOffersDeletion() {
+        launchActivity()
         dismissSetupIfShown()
-        val application = composeRule.activity.application as NonotiApplication
         runBlocking {
             application.database.dao().upsertFocusBlock(FocusBlockEntity(8 * 60, 9 * 60))
         }
@@ -93,10 +134,25 @@ class NonotiAppInstrumentedTest {
         }
     }
 
-    private fun dismissSetupIfShown() {
-        if (composeRule.onAllNodesWithText("Not now").fetchSemanticsNodes().isNotEmpty()) {
-            composeRule.onNodeWithText("Not now").performClick()
-        }
+    private fun launchActivity(notificationAccess: Boolean = true): ActivityScenario<MainActivity> {
+        setNotificationAccess(notificationAccess)
+        return ActivityScenario.launch(MainActivity::class.java).also { scenario = it }
     }
 
+    private fun setNotificationAccess(enabled: Boolean) {
+        val action = if (enabled) "allow_listener" else "disallow_listener"
+        ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(
+                "cmd notification $action ${context.packageName}/com.example.nonoti.notifications.NonotiNotificationListenerService",
+            ),
+        ).use { it.readBytes() }
+        composeRule.waitUntil(5_000) { AndroidFocusPlatform(context).readiness().notificationAccess == enabled }
+    }
+
+    private fun dismissSetupIfShown() {
+        val notNow = context.getString(R.string.not_now)
+        if (composeRule.onAllNodesWithText(notNow).fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithText(notNow).performClick()
+        }
+    }
 }
