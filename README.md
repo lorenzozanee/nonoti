@@ -65,7 +65,7 @@ scripts/verify-doze.sh emulator-5554
 
 ## Contributing
 
-开发约定与验证要求见 [AGENTS.md](./AGENTS.md)。
+开发约定与验证要求见 [AGENTS.md](./AGENTS.md)。开发通过 PR 合并，版本标签触发固定签名 APK 构建与 Release 草稿；配置和发布步骤见 [开发与发布](./.github/RELEASING.md)。
 
 ## License
 
