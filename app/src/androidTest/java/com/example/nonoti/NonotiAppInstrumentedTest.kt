@@ -1,5 +1,6 @@
 package com.example.nonoti
 
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
@@ -7,11 +8,11 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.UiDevice
 import com.example.nonoti.data.FocusBlockEntity
 import com.example.nonoti.notifications.AndroidFocusPlatform
 import com.example.nonoti.notifications.FocusRuntime
@@ -91,7 +92,9 @@ class NonotiAppInstrumentedTest {
     fun incompleteSetupExplainsLocalNotificationStorage() {
         launchActivity(notificationAccess = false)
         composeRule.onNodeWithText(context.getString(R.string.setup_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.notification_privacy_detail)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.notification_privacy_detail))
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -99,7 +102,7 @@ class NonotiAppInstrumentedTest {
         val activity = launchActivity(notificationAccess = false)
         val title = context.getString(R.string.setup_title)
         composeRule.onNodeWithText(title).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.not_now)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.not_now)).assertIsDisplayed().performClick()
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(title).fetchSemanticsNodes().isEmpty() }
         composeRule.onNodeWithText(title).assertDoesNotExist()
 
@@ -138,9 +141,11 @@ class NonotiAppInstrumentedTest {
 
     private fun setNotificationAccess(enabled: Boolean) {
         val action = if (enabled) "allow_listener" else "disallow_listener"
-        UiDevice.getInstance(instrumentation).executeShellCommand(
-            "cmd notification $action ${context.packageName}/com.example.nonoti.notifications.NonotiNotificationListenerService",
-        )
+        ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(
+                "cmd notification $action ${context.packageName}/com.example.nonoti.notifications.NonotiNotificationListenerService",
+            ),
+        ).use { it.readBytes() }
         composeRule.waitUntil(5_000) { AndroidFocusPlatform(context).readiness().notificationAccess == enabled }
     }
 

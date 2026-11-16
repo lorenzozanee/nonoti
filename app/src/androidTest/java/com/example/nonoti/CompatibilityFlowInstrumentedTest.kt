@@ -1,14 +1,17 @@
 package com.example.nonoti
 
+import android.app.Activity
 import android.app.NotificationManager
 import android.app.Notification
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.UiDevice
 import com.example.nonoti.notifications.AndroidFocusPlatform
 import com.example.nonoti.notifications.CompatibilityStore
 import com.example.nonoti.notifications.CompatibilityTestController
@@ -16,10 +19,15 @@ import com.example.nonoti.notifications.FocusRuntime
 import com.example.nonoti.notifications.FocusStartResult
 import com.example.nonoti.notifications.NonotiPlatform
 import com.example.nonoti.notifications.NonotiNotificationListenerService
+import com.example.nonoti.notifications.SystemChangeReceiver
+import com.example.nonoti.notifications.ZenRuleController
 import com.example.nonoti.focus.FocusSession
 import com.example.nonoti.focus.FocusState
 import com.example.nonoti.data.FocusSessionEntity
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -69,9 +77,7 @@ class CompatibilityFlowInstrumentedTest {
 
     @After
     fun tearDown() {
-        context.sendBroadcast(
-            Intent(ExternalNotificationPublisherReceiver.ACTION_CANCEL_ALL).setComponent(externalPublisher),
-        )
+        sendExternal(Intent(ExternalNotificationPublisherReceiver.ACTION_CANCEL_ALL))
         AndroidFocusPlatform(context).disableZen()
         FocusRuntime.stop()
         runBlocking { application.database.dao().clearFocusSession() }
@@ -259,7 +265,7 @@ class CompatibilityFlowInstrumentedTest {
             } == true
         }
 
-        context.sendBroadcast(
+        sendExternal(
             Intent(ExternalNotificationPublisherReceiver.ACTION_CANCEL)
                 .setComponent(externalPublisher)
                 .putExtra(ExternalNotificationPublisherReceiver.EXTRA_ID, externalId(501)),
@@ -268,6 +274,25 @@ class CompatibilityFlowInstrumentedTest {
             capturedFromExternal().singleOrNull()?.isInSystemNotificationBar == false
         }
         assertEquals(session.id, capturedFromExternal().single().sessionId)
+    }
+
+    @Test
+    fun delayedDeactivationEventDoesNotStopAnActiveRule() {
+        val platform = AndroidFocusPlatform(context)
+        val session = startReadyFocus("delayed-deactivation")
+        val ruleId = context.getSystemService(NotificationManager::class.java).automaticZenRules
+            .entries.single { it.value.name == ZenRuleController.RuleName }.key
+
+        SystemChangeReceiver().onReceive(
+            context,
+            Intent(NotificationManager.ACTION_AUTOMATIC_ZEN_RULE_STATUS_CHANGED)
+                .putExtra(NotificationManager.EXTRA_AUTOMATIC_ZEN_RULE_ID, ruleId)
+                .putExtra(NotificationManager.EXTRA_AUTOMATIC_ZEN_RULE_STATUS, 5),
+        )
+
+        assertTrue("A stale deactivation must not disable an active rule", platform.isZenActive())
+        assertEquals(session.id, FocusRuntime.current()?.id)
+        assertFalse(FocusRuntime.current()?.isUnsupported == true)
     }
 
     @Test
@@ -345,7 +370,7 @@ class CompatibilityFlowInstrumentedTest {
         group: String? = null,
         groupSummary: Boolean = false,
     ) {
-        context.sendBroadcast(
+        sendExternal(
             Intent(ExternalNotificationPublisherReceiver.ACTION_POST)
                 .setComponent(externalPublisher)
                 .putExtra(ExternalNotificationPublisherReceiver.EXTRA_ID, externalId(id))
@@ -358,10 +383,33 @@ class CompatibilityFlowInstrumentedTest {
         )
     }
 
+    private fun sendExternal(intent: Intent) {
+        val completed = CountDownLatch(1)
+        val result = AtomicInteger(Activity.RESULT_CANCELED)
+        context.sendOrderedBroadcast(
+            intent.setComponent(externalPublisher).addFlags(Intent.FLAG_RECEIVER_FOREGROUND),
+            null,
+            object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    result.set(resultCode)
+                    completed.countDown()
+                }
+            },
+            null,
+            Activity.RESULT_CANCELED,
+            null,
+            null,
+        )
+        assertTrue("External notification publisher did not finish", completed.await(30, TimeUnit.SECONDS))
+        assertEquals("External notification publisher failed", Activity.RESULT_OK, result.get())
+    }
+
     private fun setNotificationListenerAccess(enabled: Boolean) {
         val action = if (enabled) "allow_listener" else "disallow_listener"
         val component = ComponentName(context, NonotiNotificationListenerService::class.java).flattenToString()
-        UiDevice.getInstance(instrumentation).executeShellCommand("cmd notification $action $component")
+        ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand("cmd notification $action $component"),
+        ).use { it.readBytes() }
         eventually(10_000) {
             AndroidFocusPlatform(context).readiness().notificationAccess == enabled &&
                 FocusRuntime.isListenerConnected() == enabled

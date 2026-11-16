@@ -103,7 +103,7 @@ jobs:
           apk="app/build/outputs/apk/release/$apk_name"
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           "$apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/release-certificate.txt"
-          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/release-certificate.txt")"
+          actual="$(sed -n 's/^.*certificate SHA-256 digest: //p' "$RUNNER_TEMP/release-certificate.txt" | sort -u)"
           expected="$(tr -d '\r\n' < .github/release-signing-certificate.sha256)"
           test "$actual" = "$expected"
           mkdir -p release-assets

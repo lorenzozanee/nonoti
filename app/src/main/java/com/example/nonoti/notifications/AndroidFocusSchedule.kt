@@ -131,11 +131,14 @@ class SystemChangeReceiver : BroadcastReceiver() {
                 NotificationManager.EXTRA_AUTOMATIC_ZEN_RULE_STATUS,
                 NotificationManager.AUTOMATIC_RULE_STATUS_UNKNOWN,
             )
-            if (ZenRuleController(context).isOwnRuleId(ruleId) && status in RuleFailureStatuses) {
-                ZenRuleController(context).markInactive()
-                FocusRuntime.current()?.let { session ->
-                    CompatibilityStore(context).invalidate()
-                    NonotiPlatform.failOpen(context, session.id)
+            val zenController = ZenRuleController(context)
+            if (zenController.isOwnRuleId(ruleId) && ZenRuleStatusChange.isFailureStatus(status)) {
+                if (ZenRuleStatusChange.shouldFailOpen(isOwnRule = true, status = status, ownZenActive = zenController.isActive())) {
+                    zenController.markInactive()
+                    FocusRuntime.current()?.let { session ->
+                        CompatibilityStore(context).invalidate()
+                        NonotiPlatform.failOpen(context, session.id)
+                    }
                 }
                 return
             }
@@ -186,12 +189,6 @@ class SystemChangeReceiver : BroadcastReceiver() {
             NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED,
             NotificationManager.ACTION_AUTOMATIC_ZEN_RULE_STATUS_CHANGED,
         )
-        private val RuleFailureStatuses = setOf(
-            NotificationManager.AUTOMATIC_RULE_STATUS_DISABLED,
-            NotificationManager.AUTOMATIC_RULE_STATUS_REMOVED,
-            AutomaticRuleStatusDeactivated,
-        )
-        private const val AutomaticRuleStatusDeactivated = 5
         private const val TimezoneOffsetChangedAction = "android.intent.action.TIMEZONE_OFFSET_CHANGED"
     }
 }
@@ -204,4 +201,19 @@ object SystemCapabilityChange {
 object InterruptionFilterChange {
     fun shouldFailOpen(sessionId: String?, ownZenActive: Boolean): Boolean =
         sessionId != null && !ownZenActive
+}
+
+object ZenRuleStatusChange {
+    fun isFailureStatus(status: Int): Boolean = status in RuleFailureStatuses
+
+    fun shouldFailOpen(isOwnRule: Boolean, status: Int, ownZenActive: Boolean): Boolean =
+        isOwnRule && isFailureStatus(status) && !ownZenActive
+
+    private const val AutomaticRuleStatusDeactivated = 5
+
+    private val RuleFailureStatuses = setOf(
+        NotificationManager.AUTOMATIC_RULE_STATUS_DISABLED,
+        NotificationManager.AUTOMATIC_RULE_STATUS_REMOVED,
+        AutomaticRuleStatusDeactivated,
+    )
 }

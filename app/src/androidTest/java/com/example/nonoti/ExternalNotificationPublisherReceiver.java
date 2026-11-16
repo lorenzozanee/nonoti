@@ -1,5 +1,6 @@
 package com.example.nonoti;
 
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -49,6 +50,9 @@ public final class ExternalNotificationPublisherReceiver extends BroadcastReceiv
             manager.cancel(intent.getIntExtra(EXTRA_ID, 0));
         } else if (ACTION_CANCEL_ALL.equals(action)) {
             manager.cancelAll();
+        }
+        if (isOrderedBroadcast()) {
+            setResultCode(Activity.RESULT_OK);
         }
     }
 }
