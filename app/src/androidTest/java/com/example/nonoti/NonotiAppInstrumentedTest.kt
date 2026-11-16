@@ -100,6 +100,7 @@ class NonotiAppInstrumentedTest {
         val title = context.getString(R.string.setup_title)
         composeRule.onNodeWithText(title).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.not_now)).performClick()
+        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(title).fetchSemanticsNodes().isEmpty() }
         composeRule.onNodeWithText(title).assertDoesNotExist()
 
         activity.moveToState(Lifecycle.State.CREATED)

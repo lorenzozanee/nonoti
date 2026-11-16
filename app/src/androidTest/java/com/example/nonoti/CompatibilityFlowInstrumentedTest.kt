@@ -59,7 +59,12 @@ class CompatibilityFlowInstrumentedTest {
         NotificationListenerService.requestRebind(
             ComponentName(context, NonotiNotificationListenerService::class.java),
         )
-        eventually(10_000) { FocusRuntime.isListenerConnected() }
+        eventually(10_000) {
+            FocusRuntime.isListenerConnected() &&
+                context.getSystemService(NotificationManager::class.java).currentInterruptionFilter ==
+                NotificationManager.INTERRUPTION_FILTER_ALL
+        }
+        instrumentation.waitForIdleSync()
     }
 
     @After
@@ -374,7 +379,12 @@ class CompatibilityFlowInstrumentedTest {
         while (SystemClock.elapsedRealtime() < deadline && !condition()) {
             SystemClock.sleep(250)
         }
-        assertTrue("Condition was not met within ${timeoutMillis}ms", condition())
+        assertTrue(
+            "Condition was not met within ${timeoutMillis}ms; " +
+                "listener=${FocusRuntime.isListenerConnected()}, focus=${FocusRuntime.current()}, " +
+                "filter=${context.getSystemService(NotificationManager::class.java).currentInterruptionFilter}",
+            condition(),
+        )
     }
 
     private fun eventuallyWithState(
