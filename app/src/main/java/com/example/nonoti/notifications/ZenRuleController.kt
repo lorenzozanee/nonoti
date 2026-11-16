@@ -37,11 +37,15 @@ class ZenRuleController(private val context: Context) {
             )
             existing?.value?.let { rule ->
                 val currentPolicy = rule.zenPolicy
-                rule.zenPolicy = policy(
+                val desiredPolicy = policy(
                     allowCalls = currentPolicy?.priorityCategoryCalls == ZenPolicy.STATE_ALLOW,
                     allowAlarms = currentPolicy?.priorityCategoryAlarms == ZenPolicy.STATE_ALLOW,
                 )
-                notificationManager.updateAutomaticZenRule(requireNotNull(ruleId), rule)
+                // Android 13 clears the active condition even for unchanged rule updates.
+                if (currentPolicy != desiredPolicy) {
+                    rule.zenPolicy = desiredPolicy
+                    notificationManager.updateAutomaticZenRule(requireNotNull(ruleId), rule)
+                }
             }
             preferences.edit().putString(RuleIdKey, ruleId).apply()
             ruleId

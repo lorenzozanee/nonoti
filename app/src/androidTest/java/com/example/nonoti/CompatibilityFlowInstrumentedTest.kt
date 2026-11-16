@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import com.example.nonoti.notifications.AndroidFocusPlatform
 import com.example.nonoti.notifications.CompatibilityStore
 import com.example.nonoti.notifications.CompatibilityTestController
@@ -58,6 +59,7 @@ class CompatibilityFlowInstrumentedTest {
         NotificationListenerService.requestRebind(
             ComponentName(context, NonotiNotificationListenerService::class.java),
         )
+        eventually(10_000) { FocusRuntime.isListenerConnected() }
     }
 
     @After
@@ -188,23 +190,30 @@ class CompatibilityFlowInstrumentedTest {
     @Test
     fun releasingRestoreWithoutListenerFailsOpenInsteadOfAssumingRestored() {
         val platform = AndroidFocusPlatform(context)
-        val session = startReadyFocus("releasing-without-listener")
-        runBlocking {
-            val persisted = requireNotNull(application.database.dao().focusSession())
-            application.database.dao().upsertFocusSession(persisted.copy(state = FocusState.Releasing))
-        }
-        FocusRuntime.stop()
-        FocusRuntime.setListenerConnected(false)
+        val sessionId = "releasing-without-listener"
+        val now = System.currentTimeMillis()
 
         try {
+            setNotificationListenerAccess(false)
+            assertTrue(platform.enableZen())
+            runBlocking {
+                application.database.dao().upsertFocusSession(
+                    FocusSessionEntity(
+                        id = sessionId,
+                        startMillis = now - 60_000,
+                        endMillis = now + 600_000,
+                        state = FocusState.Releasing,
+                    ),
+                )
+            }
             NonotiPlatform.restore(context)
 
             eventually(7_000) {
                 val persisted = runBlocking { application.database.dao().focusSession() }
-                persisted?.id == session.id && persisted.state == FocusState.Unsupported && !platform.isZenActive()
+                persisted?.id == sessionId && persisted.state == FocusState.Unsupported && !platform.isZenActive()
             }
         } finally {
-            FocusRuntime.setListenerConnected(true)
+            setNotificationListenerAccess(true)
         }
     }
 
@@ -254,6 +263,19 @@ class CompatibilityFlowInstrumentedTest {
             capturedFromExternal().singleOrNull()?.isInSystemNotificationBar == false
         }
         assertEquals(session.id, capturedFromExternal().single().sessionId)
+    }
+
+    @Test
+    fun readinessChecksPreserveNotificationCaptureDuringFocus() {
+        val platform = AndroidFocusPlatform(context)
+        val session = startReadyFocus("readiness-preserves-capture")
+
+        repeat(3) { assertTrue(platform.readiness().isReady) }
+        publishExternal(id = 530, title = "Readiness checked")
+
+        eventually(10_000) { capturedFromExternal().singleOrNull()?.title == "Readiness checked" }
+        assertTrue(platform.isZenActive())
+        assertEquals(session.id, FocusRuntime.current()?.id)
     }
 
     @Test
@@ -329,6 +351,16 @@ class CompatibilityFlowInstrumentedTest {
                 .putExtra(ExternalNotificationPublisherReceiver.EXTRA_GROUP, group)
                 .putExtra(ExternalNotificationPublisherReceiver.EXTRA_GROUP_SUMMARY, groupSummary),
         )
+    }
+
+    private fun setNotificationListenerAccess(enabled: Boolean) {
+        val action = if (enabled) "allow_listener" else "disallow_listener"
+        val component = ComponentName(context, NonotiNotificationListenerService::class.java).flattenToString()
+        UiDevice.getInstance(instrumentation).executeShellCommand("cmd notification $action $component")
+        eventually(10_000) {
+            AndroidFocusPlatform(context).readiness().notificationAccess == enabled &&
+                FocusRuntime.isListenerConnected() == enabled
+        }
     }
 
     private fun capturedFromExternal() = runBlocking {

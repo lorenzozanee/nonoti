@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Keep active Focus and notification capture running on Android 13 when readiness checks inspect an unchanged Do Not Disturb rule.
+
 ## 0.1.5 - 2026-09-08
 
 ### Fixed
